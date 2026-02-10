@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: BFS Shortcode Suite
+ * Plugin Name: FS Shortcode Suite
  * Plugin URI:  https://botasfutsal.com
  * Description: Shortcodes profesionales para mostrar productos en carrusel Swiper con variantes, colores, tallas y precios dinámicos.
  * Version: 4.6.4
