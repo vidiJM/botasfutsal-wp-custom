@@ -13,24 +13,29 @@ if (!defined('ABSPATH')) {
 define('FS_SPRINTER_PATH', plugin_dir_path(__FILE__));
 define('FS_SPRINTER_URL', plugin_dir_url(__FILE__));
 
-// =========================
-// VALIDACIÓN CORE
-// =========================
-if (!defined('FS_IMPORTER_CORE_PATH')) {
-    add_action('admin_notices', function () {
-        echo '<div class="notice notice-error"><p>';
-        echo '<strong>FS Importer – Sprinter</strong> requiere que el plugin <strong>FS Importer Core</strong> esté activo.';
-        echo '</p></div>';
-    });
-    return;
-}
+/**
+ * =========================
+ * VALIDACIÓN CORE (ROBUSTA)
+ * =========================
+ * Se valida por clase pública del Core, no por constantes ni slugs.
+ * Evita falsos negativos por orden de carga o renombrados.
+ */
+add_action('plugins_loaded', static function (): void {
+    if (!class_exists(\FS\ImporterCore\Plugin::class)) {
+        add_action('admin_notices', static function (): void {
+            echo '<div class="notice notice-error"><p>';
+            echo '<strong>FS Importer – Sprinter</strong> requiere que el plugin <strong>FS Importer Core</strong> esté activo.';
+            echo '</p></div>';
+        });
+    }
+});
 
 // =========================
 // AUTOLOAD COMPOSER
 // =========================
 $autoload = FS_SPRINTER_PATH . 'vendor/autoload.php';
 if (!file_exists($autoload)) {
-    add_action('admin_notices', static function () {
+    add_action('admin_notices', static function (): void {
         echo '<div class="notice notice-error"><p>';
         echo '<strong>FS Importer Sprinter:</strong> Dependencias no instaladas (vendor/autoload.php).';
         echo '</p></div>';
@@ -42,7 +47,7 @@ require_once $autoload;
 // =========================
 // CARGA DE ASSETS SOLO EN PÁGINA DE PREVIEW
 // =========================
-add_action('admin_enqueue_scripts', function () {
+add_action('admin_enqueue_scripts', static function (): void {
     $currentPage = $_GET['page'] ?? '';
     if ($currentPage !== 'fs-importer') {
         return;
@@ -75,32 +80,39 @@ require_once FS_SPRINTER_PATH . 'src/Feed/SsvReader.php';
 if (file_exists(FS_SPRINTER_PATH . 'src/Feed/SprinterRowMapper.php')) {
     require_once FS_SPRINTER_PATH . 'src/Feed/SprinterRowMapper.php';
 } else {
-    // fallback por compatibilidad si el proyecto realmente lo llama SprinterMapper.php
+    // Fallback por compatibilidad
     require_once FS_SPRINTER_PATH . 'src/Feed/SprinterMapper.php';
 }
 
 require_once FS_SPRINTER_PATH . 'src/Controller/PreviewController.php';
 require_once FS_SPRINTER_PATH . 'src/Importer/SprinterOfferImporter.php';
 
-add_action('plugins_loaded', function () {
+add_action('plugins_loaded', static function (): void {
     \FS\ImporterSprinter\Admin\Menu::init();
     \FS\ImporterSprinter\Admin\Assets::init();
 });
 
+// =========================
+// WP-CLI
+// =========================
 if (defined('WP_CLI') && WP_CLI) {
-    \WP_CLI::add_command('fs:import-sprinter', \FS\ImporterSprinter\CLI\SprinterImportCommand::class);
+    \WP_CLI::add_command(
+        'fs:import-sprinter',
+        \FS\ImporterSprinter\CLI\SprinterImportCommand::class
+    );
 }
 
 // =========================
 // INVALIDACIÓN LIGERA DE CACHÉ AL TERMINAR IMPORT
 // =========================
 add_action('fs_import_finished', static function (): void {
-    // Cache versioning: cualquier consumidor (p.ej. BFS REST) puede incorporar este número en su cache key.
     $ver = (int) get_option('bfs_cache_version', 1);
     update_option('bfs_cache_version', $ver + 1, false);
 
     if (defined('WP_CLI') && WP_CLI && class_exists('\WP_CLI')) {
-        \WP_CLI::log('Cache version bumped: bfs_cache_version=' . (string) ($ver + 1));
+        \WP_CLI::log(
+            'Cache version bumped: bfs_cache_version=' . (string) ($ver + 1)
+        );
     }
 }, 10, 0);
 
@@ -109,5 +121,5 @@ add_action('fs_import_finished', static function (): void {
 // =========================
 add_action(
     'fs_importer_core_import_error',
-    fn(Throwable $e) => \FS\ImporterCore\Support\Logger::error($e)
+    static fn (Throwable $e) => \FS\ImporterCore\Support\Logger::error($e)
 );

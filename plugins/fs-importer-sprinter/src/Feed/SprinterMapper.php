@@ -40,7 +40,12 @@ final class SprinterMapper
             }
 
             // ===== SIZE =====
-            $size = SizeNormalizer::normalize($row['size'] ?? null);
+            $rawSize = $row['size'] ?? null;
+            $size = SizeNormalizer::normalize($rawSize);
+            
+            if ($size === null) {
+                error_log('SIZE ERROR: ' . print_r($rawSize, true));
+            }
 
             // ===== MODELO LIMPIO =====
             $titleForModel = $titleRaw;

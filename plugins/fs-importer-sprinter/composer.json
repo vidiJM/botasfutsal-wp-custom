@@ -1,12 +1,10 @@
 {
-  "name": "fs/importer-sprinter",
+  "name": "fs/importer-core",
   "type": "wordpress-plugin",
   "autoload": {
     "psr-4": {
-      "FS\\ImporterSprinter\\": "src/"
+      "FS\\ImporterCore\\": "src/"
     }
   },
-  "require": {
-    "php": ">=8.0"
-  }
+  "require": {}
 }
