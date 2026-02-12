@@ -17,7 +17,8 @@ final class VariantImporter
             return 0;
         }
 
-        $colorKey = strtoupper(trim((string) $variant->color));
+        // Normaliza el color para usarlo como clave consistente
+        $colorKey = static::normalizeColorKey($variant->color);
 
         $existing = get_posts([
             'post_type'   => 'fs_variante',
@@ -110,5 +111,10 @@ final class VariantImporter
         }
 
         return $postId;
+    }
+
+    private static function normalizeColorKey(string $color): string
+    {
+        return strtoupper(trim($color));
     }
 }
