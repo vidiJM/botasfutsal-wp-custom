@@ -29,28 +29,38 @@ final class Grid_Dataset_Builder
             return [];
         }
 
-        $filter_color = $filters['color'] ?? '';
-        $filter_color = is_string($filter_color) ? $filter_color : '';
-        $filter_color = $filter_color !== '' ? sanitize_title($filter_color) : '';
+        $filter_color = '';
+        if (!empty($filters['color']) && is_string($filters['color'])) {
+            $filter_color = sanitize_title($filters['color']);
+        }
 
         $products = [];
 
         foreach ($product_ids as $product_id) {
 
-            $variants = $this->get_variants((int) $product_id);
-            if (empty($variants)) {
+            $product_id = (int) $product_id;
+            if ($product_id <= 0) {
                 continue;
             }
 
-            $title     = get_the_title((int) $product_id);
-            $permalink = get_permalink((int) $product_id);
+            $variants = $this->get_variants($product_id);
+            if (!$variants) {
+                continue;
+            }
 
-            if (!is_string($title) || $title === '' || !is_string($permalink) || $permalink === '') {
+            $title     = get_the_title($product_id);
+            $permalink = get_permalink($product_id);
+
+            if (!is_string($title) || $title === '') {
+                continue;
+            }
+
+            if (!is_string($permalink) || $permalink === '') {
                 continue;
             }
 
             $product_data = [
-                'id'        => (int) $product_id,
+                'id'        => $product_id,
                 'name'      => $title,
                 'permalink' => $permalink,
                 'colors'    => [],
@@ -59,19 +69,22 @@ final class Grid_Dataset_Builder
             foreach ($variants as $variant) {
 
                 $variant_id = (int) $variant->ID;
+                if ($variant_id <= 0) {
+                    continue;
+                }
 
                 $color = $this->get_variant_color($variant_id);
                 if (!$color) {
                     continue;
                 }
 
-                // ✅ Si hay filtro de color, solo construimos ese color (1 dot)
+                // Si hay filtro de color → solo ese color
                 if ($filter_color !== '' && $color !== $filter_color) {
                     continue;
                 }
 
                 $offers = $this->get_valid_offers($variant_id);
-                if (empty($offers)) {
+                if (!$offers) {
                     continue;
                 }
 
@@ -84,21 +97,20 @@ final class Grid_Dataset_Builder
 
                 foreach ($offers as $offer) {
 
-                    $size  = (string) ($offer['size'] ?? '');
-                    $price = (float)  ($offer['price'] ?? 0);
+                    $size  = (string) $offer['size'];
+                    $price = (float)  $offer['price'];
 
                     if ($size === '' || $price <= 0) {
                         continue;
                     }
 
-                    // Mejor precio por talla
                     if (
                         !isset($product_data['colors'][$color]['sizes'][$size]) ||
                         $price < (float) $product_data['colors'][$color]['sizes'][$size]['price']
                     ) {
                         $product_data['colors'][$color]['sizes'][$size] = [
                             'price' => $price,
-                            'url'   => (string) ($offer['url'] ?? ''),
+                            'url'   => (string) $offer['url'],
                         ];
                     }
                 }
@@ -123,6 +135,8 @@ final class Grid_Dataset_Builder
             'post_parent'    => $product_id,
             'numberposts'    => -1,
             'no_found_rows'  => true,
+            'update_post_meta_cache' => false,
+            'update_post_term_cache' => false,
         ]);
     }
 
@@ -144,25 +158,21 @@ final class Grid_Dataset_Builder
     }
 
     /**
-     * Devuelve array de URLs de imágenes (main + galería), tolerante a formatos distintos.
-     *
      * @return array<int, string>
      */
     private function get_variant_images(int $variant_id): array
     {
         $images = [];
 
-        // main
         $main = get_post_meta($variant_id, 'fs_image_main_url', true);
         if (is_string($main) && $main !== '') {
             $images[] = esc_url_raw($main);
         }
 
-        // fs_images puede venir con saltos de línea o comas
         $raw = get_post_meta($variant_id, 'fs_images', true);
         if (is_string($raw) && $raw !== '') {
             $split = preg_split('/[\r\n,]+/', $raw);
-            if (is_array($split)) {
+            if ($split) {
                 foreach ($split as $img) {
                     $img = trim((string) $img);
                     if ($img !== '') {
@@ -172,11 +182,9 @@ final class Grid_Dataset_Builder
             }
         }
 
-        // fs_images_raw en algunos casos viene separado por comas
         $raw2 = get_post_meta($variant_id, 'fs_images_raw', true);
         if (is_string($raw2) && $raw2 !== '') {
-            $split2 = explode(',', $raw2);
-            foreach ($split2 as $img) {
+            foreach (explode(',', $raw2) as $img) {
                 $img = trim((string) $img);
                 if ($img !== '') {
                     $images[] = esc_url_raw($img);
@@ -188,14 +196,14 @@ final class Grid_Dataset_Builder
     }
 
     /**
-     * ⚠️ CRÍTICO: fs_variant_id en ofertas es HASH externo.
+     * ⚠️ fs_variant_id en ofertas es HASH externo.
      *
      * @return array<int, array{size:string, price:float, url:string}>
      */
     private function get_valid_offers(int $variant_id): array
     {
-        // ✅ Obtener hash real de la variante
         $variant_hash = get_post_meta($variant_id, 'fs_variant_id', true);
+
         if (!is_string($variant_hash) || $variant_hash === '') {
             return [];
         }
@@ -204,10 +212,11 @@ final class Grid_Dataset_Builder
             'post_type'      => 'fs_oferta',
             'post_status'    => 'publish',
             'numberposts'    => -1,
+            'no_found_rows'  => true,
             'meta_query'     => [
                 [
                     'key'     => 'fs_variant_id',
-                    'value'   => $variant_hash, // ✅ hash, no ID
+                    'value'   => $variant_hash,
                     'compare' => '=',
                 ],
                 [
@@ -226,10 +235,9 @@ final class Grid_Dataset_Builder
                     'compare' => 'EXISTS',
                 ],
             ],
-            'no_found_rows'  => true,
         ]);
 
-        if (empty($offers)) {
+        if (!$offers) {
             return [];
         }
 
@@ -244,9 +252,11 @@ final class Grid_Dataset_Builder
             if (!is_string($size) || $size === '') {
                 continue;
             }
+
             if ($price <= 0) {
                 continue;
             }
+
             if (!is_string($url) || $url === '') {
                 continue;
             }

@@ -30,7 +30,7 @@ final class Product_Grid
             'brand'     => '',
             'size'      => '',
             'per_page'  => 12,
-        ], $atts);
+        ], $atts, 'fs_grid');
 
         $filters = [
             'color'     => sanitize_title($atts['color']),
@@ -45,11 +45,10 @@ final class Product_Grid
 
         $result = $this->service->get_grid($filters, $page, $per_page);
 
-        // Encolar assets solo cuando se usa el shortcode
+        // Encolar assets solo si se usa el shortcode
         wp_enqueue_script('fs-grid');
         wp_enqueue_style('fs-grid');
 
-        // Pasar configuración al JS
         wp_localize_script('fs-grid', 'FSGridConfig', [
             'restUrl'  => esc_url_raw(rest_url('fs/v1/grid')),
             'filters'  => $filters,
@@ -69,7 +68,7 @@ final class Product_Grid
         echo '</div>';
 
         if ($result['has_more']) {
-            echo '<button class="fs-grid-load-more button">Ver más</button>';
+            echo '<button type="button" class="fs-grid-load-more">Ver más</button>';
         }
 
         return ob_get_clean();
@@ -77,29 +76,61 @@ final class Product_Grid
 
     /**
      * Render de una tarjeta de producto
+     *
+     * @param array<string, mixed> $product
      */
     private function render_card(array $product): void
     {
-        $product_id = (int) $product['id'];
-        $name       = esc_html($product['name']);
-        $permalink  = esc_url($product['permalink']);
-        $dataset    = esc_attr(wp_json_encode($product));
-    
+        $product_id = isset($product['id']) ? (int) $product['id'] : 0;
+
+        $name = isset($product['name']) && is_string($product['name'])
+            ? esc_html($product['name'])
+            : '';
+
+        $permalink = isset($product['permalink']) && is_string($product['permalink'])
+            ? esc_url($product['permalink'])
+            : '#';
+
+        if ($product_id <= 0 || $name === '' || $permalink === '#') {
+            return;
+        }
+
+        $dataset = esc_attr(wp_json_encode($product));
+
         echo '<a href="' . $permalink . '" class="fs-card" data-product="' . $dataset . '">';
-    
+
         echo '<div class="fs-card__image-wrapper">';
-        echo '<img class="fs-card__image fs-card__image--primary" src="" alt="' . $name . '">';
-        echo '<img class="fs-card__image fs-card__image--secondary" src="" alt="' . $name . '">';
+
+        echo '<img 
+                class="fs-card__image fs-card__image--primary" 
+                src="" 
+                alt="' . $name . '" 
+                loading="lazy" 
+                decoding="async"
+            >';
+
+        echo '<img 
+                class="fs-card__image fs-card__image--secondary" 
+                src="" 
+                alt="' . $name . '" 
+                loading="lazy" 
+                decoding="async"
+            >';
+
         echo '</div>';
-    
+
         echo '<div class="fs-card__content">';
+
         echo '<h3 class="fs-card__title">' . $name . '</h3>';
-        echo '<div class="fs-card__sizes-count"></div>';
-        echo '<div class="fs-card__price"></div>';
+
+        echo '<div class="fs-card__sizes-count" aria-live="polite"></div>';
+
+        echo '<div class="fs-card__price" aria-live="polite"></div>';
+
         echo '<div class="fs-card__colors"></div>';
+
         echo '</div>';
-    
+
         echo '</a>';
     }
-
 }

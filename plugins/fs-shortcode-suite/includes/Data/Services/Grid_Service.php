@@ -32,67 +32,61 @@ final class Grid_Service {
     {
         $page     = max(1, $page);
         $per_page = max(1, min(48, $per_page));
-
+    
         $cache_key = $this->cache->generate_key($filters, $page, $per_page);
-        $cached = $this->cache->get($cache_key);
-        if ($cached !== null) {
+    
+        if ($cached = $this->cache->get($cache_key)) {
             return $cached;
         }
-        
-        // 1️⃣ Productos válidos partiendo de ofertas
+    
+        // 1️⃣ Ya vienen filtrados desde repository (offer-driven)
         $product_ids = $this->repository->get_valid_product_ids($filters);
-
-        if (empty($product_ids)) {
+    
+        if (!$product_ids) {
             return $this->empty_response();
         }
-
-        // 2️⃣ Aplicar filtros de variante (color, gender, age_group)
-        $product_ids = $this->apply_variant_filters($product_ids, $filters);
-
-        if (empty($product_ids)) {
-            return $this->empty_response();
-        }
-
-        // 3️⃣ Filtro brand (nivel producto)
+    
+        // 2️⃣ Filtro brand (producto)
         if (!empty($filters['brand'])) {
             $product_ids = $this->filter_products_by_taxonomy(
                 $product_ids,
                 'fs_marca',
-                $filters['brand']
+                sanitize_title((string) $filters['brand'])
             );
         }
-
-        if (empty($product_ids)) {
+    
+        if (!$product_ids) {
             return $this->empty_response();
         }
-
-        // 4️⃣ Paginación
+    
+        // 3️⃣ Paginación
         $total     = count($product_ids);
         $offset    = ($page - 1) * $per_page;
         $paged_ids = array_slice($product_ids, $offset, $per_page);
         $has_more  = ($offset + $per_page) < $total;
-
-        if (empty($paged_ids)) {
+    
+        if (!$paged_ids) {
             return [
                 'items'    => [],
                 'total'    => $total,
                 'has_more' => false,
             ];
         }
-
-        // 5️⃣ Dataset coherente final
+    
+        // 4️⃣ Construcción dataset
         $dataset = $this->builder->build($paged_ids, $filters);
-
+    
         $result = [
             'items'    => $dataset,
             'total'    => $total,
             'has_more' => $has_more,
         ];
-        
+    
         $this->cache->set($cache_key, $result);
-        
+    
         return $result;
     }
+
 
     /**
      * Aplica filtros de variante de forma inclusiva (AND real).

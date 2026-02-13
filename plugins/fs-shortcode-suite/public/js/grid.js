@@ -53,17 +53,17 @@
 
     const initializeCards = (scope = document) => {
 
-        const cards = scope.querySelectorAll('.fs-card');
-
-        cards.forEach(card => {
+        scope.querySelectorAll('.fs-card').forEach(card => {
 
             if (card.dataset.initialized) return;
 
             try {
                 card._data = JSON.parse(card.dataset.product);
-            } catch (e) {
+            } catch {
                 return;
             }
+
+            card._activeColor = null;
 
             renderColorDots(card);
 
@@ -91,7 +91,6 @@
             dot.type = 'button';
             dot.className = 'fs-color-dot';
             dot.dataset.color = color;
-
             dot.style.background =
                 colorMap[color.toLowerCase()] || '#ccc';
 
@@ -113,6 +112,8 @@
         const colorData = card._data?.colors?.[color];
         if (!colorData) return;
 
+        card._activeColor = color;
+
         const images = colorData.images || [];
         const sizes  = colorData.sizes || {};
 
@@ -121,42 +122,33 @@
         const priceEl   = card.querySelector('.fs-card__price');
         const sizesEl   = card.querySelector('.fs-card__sizes-count');
 
-        /* FORCE repaint fix (soluciona bug hover) */
-        card.classList.add('fs-force-repaint');
-        void card.offsetWidth;
-        card.classList.remove('fs-force-repaint');
-
-        /* Images */
+        /* Update images */
 
         if (primary) primary.src = images[0] || '';
         if (secondary) secondary.src = images[1] || images[0] || '';
 
-        /* Price mínimo */
+        /* Calculate min price */
 
         const prices = Object.values(sizes)
             .map(s => s.price)
-            .filter(Boolean);
+            .filter(p => typeof p === 'number' && p > 0);
 
         const minPrice = prices.length ? Math.min(...prices) : 0;
 
         if (priceEl) {
-            priceEl.textContent = minPrice > 0
+            priceEl.textContent = minPrice
                 ? minPrice.toFixed(2).replace('.', ',') + ' €'
                 : '';
         }
 
-        /* Sizes count */
+        /* Update size count */
 
         if (sizesEl) {
             const totalSizes = Object.keys(sizes).length;
-            sizesEl.textContent =
-                totalSizes > 0
-                    ? `${totalSizes} ${totalSizes === 1 ? 'talla' : 'tallas'}`
-                    : '';
+            sizesEl.textContent = totalSizes
+                ? `${totalSizes} ${totalSizes === 1 ? 'talla' : 'tallas'}`
+                : '';
         }
-
-        /* Guardar color activo */
-        card._activeColor = color;
     };
 
     /* ==========================
@@ -184,36 +176,23 @@
             dot.classList.add('is-active');
 
             updateCard(card, color);
-
             return;
         }
+    });
 
-        /* SIZE CLICK (si decides renderizar tallas individuales luego) */
-        const sizeBtn = e.target.closest('.fs-size-btn');
-        if (sizeBtn) {
+    /* Optional: hover preview like Nike */
+    document.addEventListener('mouseover', (e) => {
 
-            e.preventDefault();
-            e.stopPropagation();
+        const dot = e.target.closest('.fs-color-dot');
+        if (!dot) return;
 
-            const card = sizeBtn.closest('.fs-card');
-            if (!card) return;
+        const card = dot.closest('.fs-card');
+        if (!card) return;
 
-            const color = card._activeColor;
-            const size  = sizeBtn.dataset.size;
+        const color = dot.dataset.color;
+        if (!color) return;
 
-            if (!color || !size) return;
-
-            const sizeData = card._data.colors[color].sizes[size];
-            if (!sizeData) return;
-
-            const priceEl = card.querySelector('.fs-card__price');
-            if (priceEl) {
-                priceEl.textContent =
-                    sizeData.price.toFixed(2).replace('.', ',') + ' €';
-            }
-
-            return;
-        }
+        updateCard(card, color);
     });
 
     /* ==========================
