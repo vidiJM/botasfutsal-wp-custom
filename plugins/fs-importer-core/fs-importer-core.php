@@ -10,7 +10,7 @@ declare(strict_types=1);
 if (!defined('ABSPATH')) {
     exit;
 }
-
+define('FS_IMPORTER_CORE_VERSION', '0.2.0');
 define('FS_IMPORTER_CORE_PATH', plugin_dir_path(__FILE__));
 define('FS_IMPORTER_CORE_URL', plugin_dir_url(__FILE__));
 

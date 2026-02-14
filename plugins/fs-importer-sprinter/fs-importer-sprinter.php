@@ -21,14 +21,20 @@ define('FS_SPRINTER_URL', plugin_dir_url(__FILE__));
  * Evita falsos negativos por orden de carga o renombrados.
  */
 add_action('plugins_loaded', static function (): void {
-    if (!class_exists(\FS\ImporterCore\Plugin::class)) {
+
+    if (!defined('FS_IMPORTER_CORE_VERSION')) {
+
         add_action('admin_notices', static function (): void {
             echo '<div class="notice notice-error"><p>';
             echo '<strong>FS Importer – Sprinter</strong> requiere que el plugin <strong>FS Importer Core</strong> esté activo.';
             echo '</p></div>';
         });
+
+        return;
     }
-});
+
+}, 20);
+
 
 // =========================
 // AUTOLOAD COMPOSER
