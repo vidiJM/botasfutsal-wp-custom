@@ -23,8 +23,9 @@ final class Settings_Page {
 
         <div class="fs-admin-wrap">
 
-            <div class="fs-admin-header">
+            <div class="fs-admin-header fs-admin-header--brand">
                 <h1>Settings</h1>
+                    <span class="fs-badge fs-badge--muted">Settings</span>
                 <p>Configuración global del motor FS Shortcode Suite.</p>
             </div>
 

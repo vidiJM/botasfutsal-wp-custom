@@ -6,6 +6,7 @@ namespace FS\ShortcodeSuite\Core;
 use FS\ShortcodeSuite\Admin\Admin_Menu;
 use FS\ShortcodeSuite\Shortcodes\Product_Grid;
 use FS\ShortcodeSuite\Shortcodes\Product_Search;
+use FS\ShortcodeSuite\Shortcodes\Size_Guide;
 
 
 final class Plugin {
@@ -21,5 +22,6 @@ final class Plugin {
         ( new Admin_Menu() )->init();
         ( new Product_Grid() )->register();
         ( new Product_Search() )->register();
+        ( new Size_Guide() )->register();
     }
 }

@@ -57,6 +57,29 @@ final class Assets {
             FS_SC_SUITE_VERSION,
             true
         );
+
+        /*
+        |--------------------------------------------------------------------------
+        | SIZE GUIDE
+        |--------------------------------------------------------------------------
+        */
+
+        wp_register_style(
+            'fs-size-guide',
+            FS_SC_SUITE_URL . 'public/css/size-guide.css',
+            [],
+            FS_SC_SUITE_VERSION
+        );
+        
+        wp_register_script(
+            'fs-size-guide',
+            FS_SC_SUITE_URL . 'public/js/size-guide.js',
+            [],
+            FS_SC_SUITE_VERSION,
+            true
+        );
+
+        // No registramos JS porque es contenido informativo estático.
     }
 
     /*
@@ -81,5 +104,17 @@ final class Assets {
 
         wp_enqueue_style('fs-search');
         wp_enqueue_script('fs-search');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Enqueue SIZE GUIDE
+    |--------------------------------------------------------------------------
+    */
+
+    public static function enqueue_size_guide(): void {
+
+        wp_enqueue_style('fs-size-guide');
+        wp_enqueue_script('fs-size-guide');
     }
 }

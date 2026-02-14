@@ -10,10 +10,12 @@ use FS\ShortcodeSuite\Core\Assets;
 use FS\ShortcodeSuite\Admin\Admin_Menu;
 use FS\ShortcodeSuite\Shortcodes\Product_Grid;
 use FS\ShortcodeSuite\Shortcodes\Product_Search;
+use FS\ShortcodeSuite\Shortcodes\Size_Guide;
 use FS\ShortcodeSuite\Data\Services\Search_Service;
 use FS\ShortcodeSuite\Data\Services\Grid_Service;
 use FS\ShortcodeSuite\REST\Search_Controller;
 use FS\ShortcodeSuite\REST\Grid_Controller;
+
 
 defined('ABSPATH') || exit;
 
@@ -23,6 +25,7 @@ final class Loader
     {
         $this->boot_grid_system();
         $this->boot_search_system();
+        $this->boot_misc_shortcodes();
         $this->boot_shortcodes(); // 👈 AÑADE ESTO
         $this->boot_admin();
     }
@@ -35,6 +38,11 @@ final class Loader
     private function boot_shortcodes(): void
     {
         new Product_Search();
+    }
+    
+    private function boot_misc_shortcodes(): void
+    {
+        new Size_Guide();
     }
     
     private function boot_grid_system(): void
@@ -72,7 +80,7 @@ final class Loader
             $controller->register_routes();
         });
     }
-
+    
     /*
     |--------------------------------------------------------------------------
     | Admin Area
