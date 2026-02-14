@@ -5,38 +5,58 @@
 
         if (typeof FSSearchConfig === 'undefined') return;
 
-        const wrapper  = document.querySelector('[data-fs-search]');
-        const overlay  = document.querySelector('[data-fs-search-overlay]');
-        const input    = overlay?.querySelector('.fs-search-input');
-        const results  = overlay?.querySelector('[data-fs-search-results]');
-        const closeBtn = overlay?.querySelector('.fs-search-close');
+        const overlays = document.querySelectorAll('[data-fs-search-overlay]');
+        const wrappers = document.querySelectorAll('[data-fs-search]');
 
-        if (!wrapper || !overlay || !input || !results) return;
+        if (!overlays.length || !wrappers.length) return;
+
+        const overlay = overlays[0]; // overlay único global
+        const input   = overlay.querySelector('.fs-search-input');
+        const results = overlay.querySelector('[data-fs-search-results]');
+        const closeBtn = overlay.querySelector('.fs-search-close');
+
+        if (!input || !results) return;
 
         let controller = null;
+        let debounceTimer = null;
 
-        /* =========================
+        /* =====================================
+           UTILITIES
+        ===================================== */
+
+        const escapeHTML = (str = '') =>
+            str.replace(/[&<>"']/g, m => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            })[m]);
+
+        /* =====================================
            OPEN / CLOSE
-        ========================= */
+        ===================================== */
 
-        const openOverlay = () => {
+        const openOverlay = (wrapper) => {
             overlay.classList.add('is-active');
             overlay.setAttribute('aria-hidden', 'false');
+
             wrapper.querySelector('.fs-search-trigger')
                    ?.setAttribute('aria-expanded', 'true');
 
             document.body.classList.add('fs-search-open');
 
-            setTimeout(() => {
-                input.focus();
-            }, 50);
+            setTimeout(() => input.focus(), 50);
         };
 
         const closeOverlay = () => {
             overlay.classList.remove('is-active');
             overlay.setAttribute('aria-hidden', 'true');
-            wrapper.querySelector('.fs-search-trigger')
-                   ?.setAttribute('aria-expanded', 'false');
+
+            wrappers.forEach(w =>
+                w.querySelector('.fs-search-trigger')
+                 ?.setAttribute('aria-expanded', 'false')
+            );
 
             document.body.classList.remove('fs-search-open');
 
@@ -44,14 +64,20 @@
             results.innerHTML = '';
         };
 
-        wrapper.addEventListener('click', openOverlay);
+        wrappers.forEach(wrapper => {
+
+            const trigger = wrapper.querySelector('.fs-search-bar, .fs-search-trigger');
+
+            trigger?.addEventListener('click', (e) => {
+                e.preventDefault();
+                openOverlay(wrapper);
+            });
+        });
 
         closeBtn?.addEventListener('click', closeOverlay);
 
         overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) {
-                closeOverlay();
-            }
+            if (e.target === overlay) closeOverlay();
         });
 
         document.addEventListener('keydown', (e) => {
@@ -60,13 +86,13 @@
             }
         });
 
-        /* =========================
+        /* =====================================
            SEARCH LOGIC
-        ========================= */
+        ===================================== */
 
-        input.addEventListener('input', async (e) => {
+        const performSearch = async (query) => {
 
-            const query = e.target.value.trim();
+            query = query.trim();
 
             if (query.length < FSSearchConfig.minLength) {
                 results.innerHTML = '';
@@ -75,6 +101,12 @@
 
             if (controller) controller.abort();
             controller = new AbortController();
+
+            results.innerHTML = `
+                <div class="fs-search-loading">
+                    Buscando...
+                </div>
+            `;
 
             try {
 
@@ -95,11 +127,20 @@
                     console.error('Search error:', error);
                 }
             }
+        };
+
+        input.addEventListener('input', (e) => {
+
+            clearTimeout(debounceTimer);
+
+            debounceTimer = setTimeout(() => {
+                performSearch(e.target.value);
+            }, 250);
         });
 
-        /* =========================
+        /* =====================================
            RENDER RESULTS
-        ========================= */
+        ===================================== */
 
         const renderResults = (items) => {
 
@@ -114,16 +155,22 @@
 
             results.innerHTML = items.map(item => `
                 <a href="${item.permalink}" class="fs-search-result-item">
-                    ${item.image 
-                        ? `<img src="${item.image}" alt="${item.name}" loading="lazy" decoding="async">`
+                    ${
+                        item.image
+                        ? `<img src="${escapeHTML(item.image)}"
+                                alt="${escapeHTML(item.name)}"
+                                loading="lazy"
+                                decoding="async">`
                         : ''
                     }
                     <div>
-                        <div class="fs-search-result-title">${item.name}</div>
+                        <div class="fs-search-result-title">
+                            ${escapeHTML(item.name)}
+                        </div>
                         ${
                             item.price
                             ? `<div class="fs-search-result-price">
-                                ${item.price.toFixed(2).replace('.', ',')} €
+                                ${Number(item.price).toFixed(2).replace('.', ',')} €
                                </div>`
                             : ''
                         }
