@@ -1,88 +1,346 @@
+/* Admin UI - scoped */
 .fs-admin-wrap {
-    padding: 40px;
-    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  padding-top: 12px;
+}
+
+.fs-admin-header {
+  margin: 10px 0 18px;
+}
+
+.fs-admin-header__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
 }
 
 .fs-admin-header h1 {
-    font-size: 26px;
-    margin-bottom: 6px;
+  font-size: 28px;
+  line-height: 1.1;
+  margin: 0;
 }
 
 .fs-admin-header p {
-    color: #666;
-    margin-bottom: 30px;
+  color: #606a73;
+  margin: 0;
+  max-width: 980px;
 }
 
-.fs-admin-card {
-    background: #fff;
-    padding: 40px;
-    border-radius: 12px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
-    max-width: 900px;
+/* Shell layout */
+.fs-admin-shell {
+  display: grid;
+  gap: 16px;
 }
 
-.fs-admin-card h2 {
-    margin-bottom: 24px;
+.fs-admin-shell--2col {
+  grid-template-columns: 1.15fr 0.85fr;
 }
 
+@media (max-width: 1100px) {
+  .fs-admin-shell--2col {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Card */
+.fs-card {
+  background: #fff;
+  border: 1px solid #e6e8eb;
+  border-radius: 12px;
+  padding: 18px;
+}
+
+.fs-card__header {
+  margin-bottom: 14px;
+}
+
+.fs-card__title {
+  font-size: 16px;
+  margin: 0 0 6px;
+}
+
+.fs-card__subtitle {
+  margin: 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+/* Badges / pills */
+.fs-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid #e6e8eb;
+  background: #fff;
+}
+
+.fs-badge--muted {
+  color: #6b7280;
+  background: #f8fafc;
+}
+
+.fs-pill {
+  display: inline-flex;
+  align-items: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  border: 1px solid #e6e8eb;
+}
+
+/* Form grid */
 .fs-form-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 24px;
-    margin-bottom: 30px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 12px 0 14px;
+}
+
+@media (max-width: 900px) {
+  .fs-form-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .fs-field label {
-    display: block;
-    font-weight: 600;
-    margin-bottom: 6px;
+  display: block;
+  font-weight: 600;
+  margin-bottom: 6px;
 }
 
 .fs-field input {
-    width: 100%;
-    padding: 10px 12px;
-    border-radius: 6px;
-    border: 1px solid #ddd;
-    font-size: 14px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #d6dbe1;
+  font-size: 14px;
+  background: #fff;
 }
 
+.fs-field input:focus {
+  outline: none;
+  border-color: #2271b1;
+  box-shadow: 0 0 0 2px rgba(34, 113, 177, 0.15);
+}
+
+.fs-help {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* Actions */
+.fs-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+/* Keep your class, but make it WP-friendly */
 .fs-btn-primary {
-    background: #111;
-    color: #fff;
-    padding: 12px 20px;
-    border-radius: 6px;
-    border: none;
-    cursor: pointer;
-    font-weight: 600;
-    margin-bottom: 30px;
+  border-radius: 10px !important;
+  padding: 10px 14px !important;
+  font-weight: 600 !important;
 }
 
-.fs-btn-primary:hover {
-    background: #000;
+/* Output */
+.fs-output {
+  margin-top: 16px;
+}
+
+.fs-output__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
 }
 
 .fs-output label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: 600;
+  font-weight: 600;
 }
 
 .fs-code-box {
-    background: #f5f5f5;
-    padding: 14px;
-    border-radius: 6px;
-    font-family: monospace;
-    margin-bottom: 12px;
+  background: #0b1220;
+  color: #e5e7eb;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 13px;
+  overflow: auto;
+  margin: 0 0 10px;
 }
 
 .fs-copy-btn {
-    background: #e5e5e5;
-    border: none;
-    padding: 8px 14px;
-    border-radius: 6px;
-    cursor: pointer;
+  border-radius: 10px !important;
 }
 
-.fs-copy-btn:hover {
-    background: #ddd;
+/* Docs */
+.fs-doc h3 {
+  margin: 14px 0 8px;
+  font-size: 14px;
+}
+
+.fs-snippet {
+  background: #f8fafc;
+  border: 1px solid #e6e8eb;
+  padding: 10px 12px;
+  border-radius: 10px;
+  margin: 8px 0;
+}
+
+.fs-snippet code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12.5px;
+}
+
+.fs-list {
+  margin: 8px 0 0 18px;
+  color: #374151;
+}
+
+.fs-callout {
+  margin-top: 14px;
+  padding: 12px 12px;
+  border-radius: 10px;
+  border: 1px solid #e6e8eb;
+  background: #f8fafc;
+  color: #374151;
+  font-size: 13px;
+}
+
+.fs-table {
+  margin-top: 10px;
+}
+
+/* Tiles */
+.fs-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+@media (max-width: 900px) {
+  .fs-tiles {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fs-tile {
+  display: block;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid #e6e8eb;
+  background: #fff;
+  text-decoration: none;
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+}
+
+.fs-tile:hover {
+  border-color: #d6dbe1;
+  box-shadow: 0 10px 22px rgba(0,0,0,0.06);
+  transform: translateY(-1px);
+}
+
+.fs-tile__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.fs-tile h3 {
+  margin: 0;
+  font-size: 14px;
+  color: #111827;
+}
+
+.fs-tile p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+/* Divider */
+.fs-divider {
+  margin: 18px 0;
+  border: 0;
+  border-top: 1px solid #e6e8eb;
+}
+/* ================================
+   BRANDING
+================================ */
+
+:root {
+  --fs-green-light: #7AC70C;   /* verde lima */
+  --fs-green-dark:  #5FA104;   /* verde profundo */
+  --fs-blue-dark:   #1F2A3F;   /* azul marino */
+  --fs-blue-soft:   #6B7A8F;   /* gris azulado */
+  --fs-yellow:      #F2C14E;   /* mostaza */
+  --fs-black:       #000000;
+}
+
+.fs-admin-header--brand {
+  background: linear-gradient(
+      135deg,
+      var(--fs-green-light),
+      var(--fs-green-dark)
+  );
+  color: #fff;
+  padding: 24px;
+  border-radius: 18px;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.fs-admin-header--brand h1 {
+  color: #fff;
+}
+
+.fs-admin-header--brand p {
+  color: rgba(255,255,255,0.85);
+}
+
+.fs-admin-logo-wrapper {
+  flex-shrink: 0;
+}
+
+.fs-admin-logo {
+  max-width: 120px;
+  height: auto;
+}
+
+.fs-badge--brand {
+  background: var(--fs-yellow);
+  color: var(--fs-blue-dark);
+  font-weight: 600;
+  border: none;
+}
+
+/* Brand buttons */
+.fs-btn-primary {
+  background: var(--fs-blue-dark) !important;
+  border-color: var(--fs-blue-dark) !important;
+  color: #fff !important;
+}
+
+.fs-btn-primary:hover {
+  background: var(--fs-black) !important;
+  border-color: var(--fs-black) !important;
+  opacity: .9;
+}
+
+/* Tile hover brand accent */
+.fs-tile:hover {
+  border-color: var(--fs-green-light);
+  box-shadow: 0 8px 20px rgba(31,42,63,0.12);
 }

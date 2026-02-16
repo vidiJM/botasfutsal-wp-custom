@@ -5,6 +5,8 @@ namespace FS\ImporterCore\Importer;
 
 use FS\ImporterCore\DTO\OfferDTO;
 
+defined('ABSPATH') || exit;
+
 final class OfferImporter
 {
     public static function upsert(OfferDTO $offer, int $variantPostId): int
@@ -13,7 +15,7 @@ final class OfferImporter
             return 0;
         }
 
-        $merchantName = trim((string) ($offer->merchantName ?? ''));
+        $merchantName = strtoupper(trim((string) ($offer->merchantName ?? '')));
         $price        = (float) ($offer->price ?? 0);
 
         if ($merchantName === '' || $price <= 0) {
@@ -23,22 +25,26 @@ final class OfferImporter
         $size = trim((string) ($offer->size ?? ''));
         $size = $size !== '' ? $size : 'UNICA';
 
-        // =========================
-        // BUSCAR OFERTA EXISTENTE
-        // VARIANTE + TIENDA + TALLA
-        // =========================
+        /*
+        |--------------------------------------------------------------------------
+        | Buscar oferta existente (Variante + Merchant + Talla)
+        |--------------------------------------------------------------------------
+        */
+
         $existing = get_posts([
             'post_type'   => 'fs_oferta',
             'post_parent' => $variantPostId,
             'meta_query'  => [
                 'relation' => 'AND',
                 [
-                    'key'   => 'fs_merchant_name',
-                    'value' => $merchantName,
+                    'key'     => 'fs_merchant_name',
+                    'value'   => $merchantName,
+                    'compare' => '=',
                 ],
                 [
-                    'key'   => 'fs_size_eu',
-                    'value' => $size,
+                    'key'     => 'fs_size_eu',
+                    'value'   => $size,
+                    'compare' => '=',
                 ],
             ],
             'fields'      => 'ids',
@@ -51,7 +57,7 @@ final class OfferImporter
             $postId = wp_insert_post([
                 'post_type'   => 'fs_oferta',
                 'post_status' => 'publish',
-                'post_title'  => trim($merchantName . ' · ' . $size),
+                'post_title'  => $merchantName . ' · ' . $size,
                 'post_parent' => $variantPostId,
             ]);
         }
@@ -60,14 +66,18 @@ final class OfferImporter
             return 0;
         }
 
-        // =========================
-        // ACF / META (ACF optional)
-        // =========================
+        /*
+        |--------------------------------------------------------------------------
+        | Writer (ACF compatible)
+        |--------------------------------------------------------------------------
+        */
+
         $writer = static function (string $key, mixed $value) use ($postId): void {
             if (function_exists('update_field')) {
                 update_field($key, $value, $postId);
                 return;
             }
+
             update_post_meta($postId, $key, $value);
         };
 
@@ -88,13 +98,16 @@ final class OfferImporter
             $writer('fs_tracking_url', (string) $offer->trackingUrl);
         }
 
-        // =========================
-        // TAXONOMÍAS
-        // =========================
+        /*
+        |--------------------------------------------------------------------------
+        | Taxonomías
+        |--------------------------------------------------------------------------
+        */
+
         TaxonomyAssigner::setSingle(
             $postId,
             'fs_tienda',
-            sanitize_text_field($merchantName)
+            $merchantName
         );
 
         TaxonomyAssigner::setSingle(

@@ -1,0 +1,770 @@
+/* ==========================================================
+   FS SEARCH – TRIGGER (BOTÓN EN PÁGINA)
+   Scopeado para NO romper el theme
+========================================================== */
+
+.fs-search {
+    display: inline-block;
+}
+
+.fs-search .fs-search-trigger {
+    appearance: none;
+    border: 0;
+    cursor: pointer;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 14px 22px;
+    border-radius: 0.5rem;
+
+    background: #66b60f;
+    color: #fff;
+
+    font-weight: 700;
+    font-size: 18px;
+    line-height: 1;
+}
+
+.fs-search .fs-search-trigger:focus {
+    outline: 2px solid rgba(102, 182, 15, 0.35);
+    outline-offset: 3px;
+}
+
+
+/* ==========================================================
+   FS SEARCH – OVERLAY
+========================================================== */
+
+.fs-search-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(4px);
+
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+.fs-search-overlay.is-active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+
+/* ==========================================================
+   PANEL
+========================================================== */
+
+.fs-search-panel {
+    width: min(1200px, 96vw);
+    height: min(85vh, 900px);
+
+    display: flex;
+    flex-direction: column;
+
+    background: #fff;
+    border-radius: 0.5rem;
+    overflow: hidden;
+
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.2);
+}
+
+
+/* ==========================================================
+   HEADER (CRÍTICO: LOGO + INPUT + CANCELAR)
+========================================================== */
+
+.fs-search-header {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+
+    padding: 16px 18px;
+    border-bottom: 1px solid #eee;
+    background: #fff;
+}
+
+.fs-search-logo {
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+}
+
+.fs-search-logo img {
+    display: block;
+    max-height: 46px;
+    width: auto;
+    height: auto;
+}
+
+.fs-search-input {
+    flex: 1 1 auto;
+    min-width: 180px;
+
+    height: 44px;
+    padding: 0 14px;
+
+    border-radius: 0.5rem;
+    border: 1px solid #e5e5e5;
+
+    font-size: 16px;
+    outline: none;
+}
+
+.fs-search-input:focus {
+    border-color: rgba(102, 182, 15, 0.6);
+    box-shadow: 0 0 0 3px rgba(102, 182, 15, 0.12);
+}
+
+.fs-search-close {
+    flex: 0 0 auto;
+    height: 40px;
+    padding: 0 14px;
+
+    border-radius: 0.5rem;
+    border: 1px solid #e5e5e5;
+    background: #f5f5f5;
+
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.fs-search-close:hover {
+    background: #eeeeee;
+}
+
+
+/* ==========================================================
+   BODY LAYOUT
+========================================================== */
+
+.fs-search-body {
+    flex: 1 1 auto;
+    min-height: 0; /* importante para scroll interno */
+}
+
+.fs-search-layout {
+    height: 100%;
+    display: grid;
+    grid-template-columns: 300px 1fr;
+}
+
+.fs-search-sidebar {
+    padding: 18px;
+    border-right: 1px solid #eee;
+    overflow: auto;
+    background: #fff;
+}
+
+.fs-search-results-col {
+    padding: 18px 22px;
+    overflow: auto;
+    background: #fff;
+}
+
+
+/* ==========================================================
+   FILTER SECTIONS (ACCORDION)
+========================================================== */
+
+.fs-filter-section {
+    border-bottom: 1px solid #f0f0f0;
+    padding: 6px 0;
+}
+
+.fs-filter-header {
+    width: 100%;
+    padding: 12px 0;
+
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    background: transparent;
+    border: 0;
+
+    cursor: pointer;
+
+    font-size: 16px;
+    font-weight: 700;
+    text-align: left;
+}
+
+.fs-filter-header::after {
+    content: "+";
+    font-size: 18px;
+    line-height: 1;
+    transition: transform 0.2s ease;
+}
+
+.fs-filter-section.active .fs-filter-header::after {
+    content: "–";
+}
+
+
+/* ==========================================================
+   FILTER OPTIONS (MEJORADO)
+========================================================== */
+
+/* Estado cerrado */
+.fs-filter-options {
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px 0 12px 0;
+}
+
+/* Estado abierto */
+.fs-filter-section.active .fs-filter-options {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+/* Texto vacío */
+.fs-filter-empty {
+    display: block;
+    padding: 6px 0;
+    color: #999;
+}
+
+
+/* ==========================================================
+   FILTER BUTTONS
+========================================================== */
+
+.fs-filter-options button {
+    width: 45%;
+    text-align: center;
+
+    padding: 10px 12px;
+    border-radius: 0.5rem;
+    border: 1px solid #e5e5e5;
+
+    background: #f4f4f4;
+    cursor: pointer;
+
+    font-size: 15px;
+    font-weight: 600;
+
+    transition: background 0.2s ease, color 0.2s ease, border 0.2s ease;
+}
+
+.fs-filter-options button:hover {
+    background: #e9e9e9;
+}
+
+.fs-filter-options button.active {
+    background: #66b60f;
+    color: #fff;
+    border-color: #66b60f;
+}
+
+
+/* ==========================================================
+   RESULTS GRID
+========================================================== */
+
+.fs-search-results {
+    display: grid;
+    gap: 18px;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.fs-search-result-card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+
+    border-radius: 0.5rem;
+    overflow: hidden;
+
+    transition: transform 0.2s ease;
+}
+
+.fs-search-result-card:hover {
+    transform: translateY(-3px);
+}
+
+.fs-search-result-image {
+    background: #f8f8f8;
+    aspect-ratio: 1 / 1;
+}
+
+.fs-search-result-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.fs-search-result-content {
+    padding: 12px;
+}
+
+.fs-search-loading,
+.fs-search-empty {
+    padding: 40px 0;
+    text-align: center;
+    font-weight: 600;
+    color: #777;
+}
+
+
+/* ==========================================================
+   RESPONSIVE
+========================================================== */
+
+@media (max-width: 992px) {
+    .fs-search-panel {
+        height: 92vh;
+        border-radius: 0.5rem;
+    }
+
+    .fs-search-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .fs-search-sidebar {
+        border-right: none;
+        border-bottom: 1px solid #eee;
+    }
+
+    .fs-search-header {
+        gap: 12px;
+    }
+
+    .fs-search-logo img {
+        max-height: 40px;
+    }
+}
+.fs-search {
+    width: 15rem;
+    border-radius: 0.5rem;
+}
+
+.fs-search-trigger {
+    height: 2rem;
+    padding: 0 1rem;
+}
+
+.fs-search .fs-search-trigger {
+    width: 100%;
+    height: 52px;
+
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+
+    padding: 0 18px;
+
+    background: #f5f5f5;
+    border-radius: 0.5rem;
+    border: 1px solid #e5e5e5;
+
+    font-size: 18px;
+    font-weight: 500;
+    color: #666;
+
+    cursor: text;
+}
+
+.fs-search .fs-search-trigger:hover {
+    border-color: #66b60f;
+}
+
+.fs-search-placeholder {
+    opacity: 0.7;
+}
+/* CONTENEDOR */
+.fs-color-filter {
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 10px;
+}
+
+/* DOT */
+.fs-color-dot {
+    width: 14%!important;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all .2s ease;
+    padding: 0;
+}
+
+/* Hover */
+.fs-color-dot:hover {
+    transform: scale(1.1);
+    border-color: #999;
+}
+
+/* Activo */
+.fs-color-dot.active {
+    border: 2px solid #000;
+    box-shadow: 0 0 0 2px #fff inset;
+}
+
+/* CONTENEDOR */
+.fs-price-slider{
+    position:relative;
+    width:100%;
+    padding:25px 0 40px;
+}
+
+/* TRACK BASE */
+.fs-price-track{
+    position:absolute;
+    top:30px;
+    left:0;
+    right:0;
+    height:6px;
+    background:#ddd;
+    border-radius:4px;
+}
+
+/* RANGO ACTIVO */
+.fs-price-range{
+    position:absolute;
+    top:30px;
+    height:6px;
+    background:#69a800;
+    border-radius:4px;
+}
+
+/* RANGE INPUT BASE */
+.fs-price-slider input[type=range]{
+    position:absolute;
+    top:22px;
+    left:0;
+    width:100%;
+    pointer-events:none;
+    background:none;
+    -webkit-appearance:none;
+}
+
+/* OCULTAR TRACK NATIVO */
+.fs-price-slider input[type=range]::-webkit-slider-runnable-track{
+    background:transparent;
+}
+.fs-price-slider input[type=range]::-moz-range-track{
+    background:transparent;
+}
+
+/* THUMB */
+.fs-price-slider input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    height:20px;
+    width:20px;
+    background:#69a800;
+    border-radius:50%;
+    cursor:pointer;
+    pointer-events:all;
+    position:relative;
+    z-index:2;
+}
+
+.fs-price-slider input[type=range]::-moz-range-thumb{
+    height:20px;
+    width:20px;
+    background:#69a800;
+    border:none;
+    border-radius:50%;
+    cursor:pointer;
+    pointer-events:all;
+    position:relative;
+    z-index:2;
+}
+
+/* VALORES */
+.fs-price-values{
+    position:absolute;
+    top:50px;
+    left:0;
+    width:100%;
+    text-align:center;
+    font-weight:600;
+}
+.fs-price-slider {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.fs-price-values {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.fs-product-card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.fs-product-card:hover {
+    transform: translateY(-4px);
+}
+
+.fs-product-card__image {
+    background: #f5f5f5;
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.fs-product-card__image img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.fs-product-card__content {
+    padding: 12px 4px 24px;
+}
+
+.fs-product-card__brand {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: #767677;
+    margin-bottom: 4px;
+}
+
+.fs-product-card__title {
+    font-size: 14px;
+    font-weight: 500;
+    margin: 0 0 6px;
+}
+
+.fs-product-card__price {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+
+.fs-product-card__colors {
+    font-size: 13px;
+    color: #767677;
+}
+/* GRID */
+[data-fs-search-results] {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 40px 24px;
+}
+
+/* CARD */
+.fs-product-card {
+    display: flex;
+    flex-direction: column;
+    text-decoration: none;
+    color: #111;
+    transition: transform .2s ease;
+}
+
+.fs-product-card:hover {
+    transform: translateY(-4px);
+}
+
+/* IMAGE */
+.fs-product-card__image {
+    background: #f6f6f6;
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 14px;
+}
+
+.fs-product-card__image img {
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+}
+
+/* BRAND */
+.fs-product-card__brand {
+    font-size: 12px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: #767677;
+    margin-bottom: 6px;
+}
+
+/* TITLE */
+.fs-product-card__title {
+    font-size: 15px;
+    font-weight: 500;
+    margin: 0 0 6px;
+    line-height: 1.3;
+}
+
+/* PRICE */
+.fs-product-card__price {
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+
+/* COLORS */
+.fs-product-card__colors {
+    font-size: 13px;
+    color: #767677;
+}
+
+.fs-product-card__content {
+    display: block !important;
+    height: auto !important;
+}
+
+/* ==============================
+   RESULTS GRID
+============================== */
+
+[data-fs-search-results] {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 48px 32px;
+    padding: 24px 32px;
+}
+
+
+/* ==============================
+   PRODUCT CARD
+============================== */
+
+.fs-product-card {
+    display: flex;
+    flex-direction: column;
+    text-decoration: none;
+    color: #111;
+    transition: transform .2s ease;
+}
+
+.fs-product-card:hover {
+    transform: translateY(-6px);
+}
+
+
+/* ==============================
+   IMAGE CONTAINER
+============================== */
+
+.fs-product-card__image {
+    background: #f6f6f6;
+    aspect-ratio: 4 / 3;
+    max-height: 260px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+    overflow: hidden;
+}
+
+.fs-product-card__image img {
+    width: 85%;
+    height: auto;
+    object-fit: contain;
+    transition: transform .3s ease;
+}
+
+.fs-product-card:hover .fs-product-card__image img {
+    transform: scale(1.05);
+}
+
+
+/* ==============================
+   CONTENT
+============================== */
+
+.fs-product-card__content {
+    display: flex;
+    flex-direction: column;
+    line-height: 1rem;
+}
+
+
+/* ==============================
+   BRAND
+============================== */
+
+.fs-product-card__brand {
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: #767677;
+    margin-bottom: 6px;
+}
+
+
+/* ==============================
+   TITLE
+============================== */
+
+.fs-product-card__title {
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.35;
+    margin: 0 0 8px;
+    color: #111;
+}
+
+
+/* ==============================
+   PRICE
+============================== */
+
+.fs-product-card__price {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 6px;
+}
+
+
+/* ==============================
+   COLORS COUNT
+============================== */
+
+.fs-product-card__colors {
+    font-size: 13px;
+    color: #767677;
+}
+
+
+/* ==============================
+   EMPTY STATE
+============================== */
+
+.fs-search-empty {
+    font-size: 16px;
+    padding: 60px 0;
+    text-align: center;
+    color: #767677;
+}
+.fs-product-card {
+    gap: 8px;
+}
+
+[data-fs-search-results] .fs-product-card__title {
+    font-size: 1rem!important;
+    line-height: 1;
+    font-weight: 600;
+}

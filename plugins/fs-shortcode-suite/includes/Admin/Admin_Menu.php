@@ -5,6 +5,7 @@ namespace FS\ShortcodeSuite\Admin;
 
 use FS\ShortcodeSuite\Admin\Pages\Dashboard_Page;
 use FS\ShortcodeSuite\Admin\Pages\Grid_Page;
+use FS\ShortcodeSuite\Admin\Pages\Search_Page;
 use FS\ShortcodeSuite\Admin\Pages\Settings_Page;
 use FS\ShortcodeSuite\Admin\Pages\System_Page;
 
@@ -19,16 +20,22 @@ final class Admin_Menu {
 
     public function register_menu(): void {
 
+        /**
+         * Menu principal SIN callback (solo contenedor)
+         */
         add_menu_page(
             'FS Shortcode Suite',
             'FS Shortcodes',
             'manage_options',
             'fs-shortcode-suite',
-            [new Dashboard_Page(), 'render'],
+            '__return_null', // 🔥 clave para evitar doble render
             'dashicons-screenoptions',
             58
         );
 
+        /**
+         * Submenu real Dashboard
+         */
         add_submenu_page(
             'fs-shortcode-suite',
             'Dashboard',
@@ -47,6 +54,24 @@ final class Admin_Menu {
             [new Grid_Page(), 'render']
         );
 
+        add_submenu_page(
+            'fs-shortcode-suite',
+            'FS Search',
+            'FS Search',
+            'manage_options',
+            'fs-shortcode-suite-search',
+            [new Search_Page(), 'render']
+        );
+
+        add_submenu_page(
+            'fs-shortcode-suite',
+            'Size Guide',
+            'Size Guide',
+            'manage_options',
+            'fs-shortcode-suite-size-guide',
+            [new \FS\ShortcodeSuite\Admin\Pages\Size_Guide_Page(), 'render']
+        );
+        
         add_submenu_page(
             'fs-shortcode-suite',
             'Settings',
