@@ -1,0 +1,4534 @@
+diff --git a/plugins/fs-importer-core/fs-importer-core.php b/plugins/fs-importer-core/fs-importer-core.php
+index 3da9ac2..98f4219 100644
+--- a/plugins/fs-importer-core/fs-importer-core.php
++++ b/plugins/fs-importer-core/fs-importer-core.php
+@@ -10,7 +10,7 @@ declare(strict_types=1);
+ if (!defined('ABSPATH')) {
+     exit;
+ }
+-
++define('FS_IMPORTER_CORE_VERSION', '0.2.0');
+ define('FS_IMPORTER_CORE_PATH', plugin_dir_path(__FILE__));
+ define('FS_IMPORTER_CORE_URL', plugin_dir_url(__FILE__));
+ 
+diff --git a/plugins/fs-importer-core/src/Aggregator/ProductAggregator.php b/plugins/fs-importer-core/src/Aggregator/ProductAggregator.php
+index 12ae1ef..c606d78 100644
+--- a/plugins/fs-importer-core/src/Aggregator/ProductAggregator.php
++++ b/plugins/fs-importer-core/src/Aggregator/ProductAggregator.php
+@@ -3,6 +3,8 @@ declare(strict_types=1);
+ 
+ namespace FS\ImporterCore\Aggregator;
+ 
++defined('ABSPATH') || exit;
++
+ final class ProductAggregator
+ {
+     public static function aggregateProduct(int $productPostId): void
+@@ -12,62 +14,68 @@ final class ProductAggregator
+         }
+ 
+         $variantIds = get_posts([
+-            'post_type'              => 'fs_variante',
+-            'post_status'            => 'publish',
+-            'post_parent'            => $productPostId,
+-            'posts_per_page'         => -1,
+-            'fields'                 => 'ids',
+-            'no_found_rows'          => true,
+-            'update_post_meta_cache' => false,
+-            'update_post_term_cache' => false,
++            'post_type'      => 'fs_variante',
++            'post_status'    => 'publish',
++            'post_parent'    => $productPostId,
++            'posts_per_page' => -1,
++            'fields'         => 'ids',
+         ]);
+ 
+-        if (!$variantIds) {
++        if (empty($variantIds)) {
+             self::resetProduct($productPostId);
+             return;
+         }
+ 
+         $offerIds = get_posts([
+-            'post_type'              => 'fs_oferta',
+-            'post_status'            => 'publish',
+-            'post_parent__in'        => $variantIds,
+-            'posts_per_page'         => -1,
+-            'fields'                 => 'ids',
+-            'no_found_rows'          => true,
+-            'update_post_meta_cache' => false,
+-            'update_post_term_cache' => false,
++            'post_type'      => 'fs_oferta',
++            'post_status'    => 'publish',
++            'post_parent__in'=> $variantIds,
++            'posts_per_page' => -1,
++            'fields'         => 'ids',
+         ]);
+ 
++        if (empty($offerIds)) {
++            self::resetProduct($productPostId);
++            return;
++        }
++
+         $minPrice    = null;
+         $maxPrice    = null;
+         $hasStock    = false;
+         $bestOfferId = null;
+         $merchants   = [];
+ 
++        $sizes     = [];
++        $surfaces  = [];
++        $colors    = [];
++
+         foreach ($offerIds as $offerId) {
+-            $offerId = (int) $offerId;
+ 
+-            $priceRaw = get_post_meta($offerId, 'fs_price', true);
+-            $price    = (float) $priceRaw;
++            $price = (float) get_post_meta($offerId, 'fs_price', true);
++            $inStock = filter_var(
++                get_post_meta($offerId, 'fs_in_stock', true),
++                FILTER_VALIDATE_BOOL
++            );
+ 
+-            if ($price <= 0) {
++            if ($price <= 0 || !$inStock) {
+                 continue;
+             }
+ 
+-            $inStockRaw = get_post_meta($offerId, 'fs_in_stock', true);
+-            $inStock    = filter_var($inStockRaw, FILTER_VALIDATE_BOOL);
++            $hasStock = true;
+ 
+-            if (!$inStock) {
+-                continue;
++            // TALLA
++            $size = trim((string) get_post_meta($offerId, 'fs_size_eu', true));
++            if ($size !== '') {
++                $sizes[$size] = true;
+             }
+ 
+-            $hasStock = true;
+-
++            // MERCHANT
+             $merchant = trim((string) get_post_meta($offerId, 'fs_merchant_name', true));
+             if ($merchant !== '') {
+                 $merchants[$merchant] = true;
+             }
+ 
++            // PRECIO
+             if ($minPrice === null || $price < $minPrice) {
+                 $minPrice    = $price;
+                 $bestOfferId = $offerId;
+@@ -76,83 +84,95 @@ final class ProductAggregator
+             if ($maxPrice === null || $price > $maxPrice) {
+                 $maxPrice = $price;
+             }
++
++            // VARIANTE PADRE
++            $variantId = (int) wp_get_post_parent_id($offerId);
++
++            // SUPERFICIE
++            $termsSurface = wp_get_post_terms($variantId, 'fs_superficie');
++            if (!is_wp_error($termsSurface)) {
++                foreach ($termsSurface as $term) {
++                    $surfaces[$term->slug] = true;
++                }
++            }
++
++            // COLOR
++            $termsColor = wp_get_post_terms($variantId, 'fs_color');
++            if (!is_wp_error($termsColor)) {
++                foreach ($termsColor as $term) {
++                    $colors[$term->slug] = true;
++                }
++            }
+         }
+ 
+-        // 🔒 regla final
+         $hasStock = $hasStock && $minPrice !== null && $minPrice > 0;
+ 
+-        $writer = static function (string $key, mixed $value) use ($productPostId): void {
+-            if (function_exists('update_field')) {
+-                update_field($key, $value, $productPostId);
+-                return;
+-            }
+-            update_post_meta($productPostId, $key, $value);
+-        };
+-
+-        $writer('fs_price_min', $hasStock ? (float) $minPrice : 0);
+-        $writer('fs_price_max', $hasStock ? (float) ($maxPrice ?? 0) : 0);
+-        $writer('fs_has_stock', $hasStock ? 1 : 0);
+-        $writer('fs_best_offer_post_id', $hasStock ? (int) $bestOfferId : '');
+-        $writer('fs_last_aggregated_at', current_time('mysql'));
+-
+-        update_post_meta(
+-            $productPostId,
+-            '_fs_merchants',
+-            $hasStock ? array_keys($merchants) : []
+-        );
++        $sizes    = array_keys($sizes);
++        $surfaces = array_keys($surfaces);
++        $colors   = array_keys($colors);
++
++        sort($sizes, SORT_NATURAL);
++        sort($surfaces);
++        sort($colors);
++
++        /*
++        |--------------------------------------------------------------------------
++        | 🔥 GUARDAR COMO STRING (ACF TEXTAREA SAFE)
++        |--------------------------------------------------------------------------
++        */
++
++        update_post_meta($productPostId, 'fs_talla_available', implode("\n", $sizes));
++        update_post_meta($productPostId, 'fs_superficie_available', implode("\n", $surfaces));
++        update_post_meta($productPostId, 'fs_color_available', implode("\n", $colors));
++
++        update_post_meta($productPostId, 'fs_price_min', $hasStock ? (float) $minPrice : 0);
++        update_post_meta($productPostId, 'fs_price_max', $hasStock ? (float) ($maxPrice ?? 0) : 0);
++        update_post_meta($productPostId, 'fs_has_stock', $hasStock ? 1 : 0);
++        update_post_meta($productPostId, 'fs_best_offer_post_id', $hasStock ? (int) $bestOfferId : '');
++        update_post_meta($productPostId, '_fs_merchants', array_keys($merchants));
++        update_post_meta($productPostId, 'fs_last_aggregated_at', current_time('mysql'));
+     }
+ 
+-    public static function aggregateAll(int $limit = 50): void
++    public static function aggregateAll(int $limit = 100): void
+     {
+-        $limit = $limit > 0 ? $limit : 50;
+         $paged = 1;
+-
++    
+         do {
+-            $q = new \WP_Query([
+-                'post_type'              => 'fs_producto',
+-                'post_status'            => 'publish',
+-                'posts_per_page'         => $limit,
+-                'paged'                  => $paged,
+-                'fields'                 => 'ids',
+-                'no_found_rows'          => false,
+-                'orderby'                => 'ID',
+-                'order'                  => 'ASC',
+-                'update_post_meta_cache' => false,
+-                'update_post_term_cache' => false,
++            $query = new \WP_Query([
++                'post_type'      => 'fs_producto',
++                'post_status'    => 'publish',
++                'posts_per_page' => $limit,
++                'paged'          => $paged,
++                'fields'         => 'ids',
++                'no_found_rows'  => true,
+             ]);
+-
+-            if (!$q->have_posts()) {
++    
++            if (!$query->have_posts()) {
+                 break;
+             }
+-
+-            foreach ($q->posts as $productId) {
++    
++            foreach ($query->posts as $productId) {
+                 self::aggregateProduct((int) $productId);
+             }
+-
++    
+             $paged++;
+-
+-            if (function_exists('gc_collect_cycles')) {
+-                gc_collect_cycles();
+-            }
+-        } while ($q->max_num_pages >= $paged);
++    
++        } while ($paged <= $query->max_num_pages);
+     }
+ 
++
+     private static function resetProduct(int $productPostId): void
+     {
+-        $writer = static function (string $key, mixed $value) use ($productPostId): void {
+-            if (function_exists('update_field')) {
+-                update_field($key, $value, $productPostId);
+-                return;
+-            }
+-            update_post_meta($productPostId, $key, $value);
+-        };
++        update_post_meta($productPostId, 'fs_price_min', 0);
++        update_post_meta($productPostId, 'fs_price_max', 0);
++        update_post_meta($productPostId, 'fs_has_stock', 0);
+ 
+-        $writer('fs_price_min', 0);
+-        $writer('fs_price_max', 0);
+-        $writer('fs_has_stock', 0);
+-        $writer('fs_best_offer_post_id', '');
+-        $writer('fs_last_aggregated_at', current_time('mysql'));
++        update_post_meta($productPostId, 'fs_talla_available', '');
++        update_post_meta($productPostId, 'fs_superficie_available', '');
++        update_post_meta($productPostId, 'fs_color_available', '');
+ 
++        update_post_meta($productPostId, 'fs_best_offer_post_id', '');
+         update_post_meta($productPostId, '_fs_merchants', []);
++        update_post_meta($productPostId, 'fs_last_aggregated_at', current_time('mysql'));
+     }
+ }
+diff --git a/plugins/fs-importer-core/src/Importer/Importer.php b/plugins/fs-importer-core/src/Importer/Importer.php
+index 562d3b1..9c37f78 100644
+--- a/plugins/fs-importer-core/src/Importer/Importer.php
++++ b/plugins/fs-importer-core/src/Importer/Importer.php
+@@ -51,6 +51,8 @@ final class Importer
+             unset($product, $productPostId);
+         }
+ 
++        ProductAggregator::aggregateAll(100);
++        
+         return [
+             'imported' => $imported,
+             'failed'   => $failed,
+diff --git a/plugins/fs-importer-core/src/Importer/OfferImporter.php b/plugins/fs-importer-core/src/Importer/OfferImporter.php
+index 7b0f9f4..e1710a1 100644
+--- a/plugins/fs-importer-core/src/Importer/OfferImporter.php
++++ b/plugins/fs-importer-core/src/Importer/OfferImporter.php
+@@ -5,6 +5,8 @@ namespace FS\ImporterCore\Importer;
+ 
+ use FS\ImporterCore\DTO\OfferDTO;
+ 
++defined('ABSPATH') || exit;
++
+ final class OfferImporter
+ {
+     public static function upsert(OfferDTO $offer, int $variantPostId): int
+@@ -13,7 +15,7 @@ final class OfferImporter
+             return 0;
+         }
+ 
+-        $merchantName = trim((string) ($offer->merchantName ?? ''));
++        $merchantName = strtoupper(trim((string) ($offer->merchantName ?? '')));
+         $price        = (float) ($offer->price ?? 0);
+ 
+         if ($merchantName === '' || $price <= 0) {
+@@ -23,22 +25,26 @@ final class OfferImporter
+         $size = trim((string) ($offer->size ?? ''));
+         $size = $size !== '' ? $size : 'UNICA';
+ 
+-        // =========================
+-        // BUSCAR OFERTA EXISTENTE
+-        // VARIANTE + TIENDA + TALLA
+-        // =========================
++        /*
++        |--------------------------------------------------------------------------
++        | Buscar oferta existente (Variante + Merchant + Talla)
++        |--------------------------------------------------------------------------
++        */
++
+         $existing = get_posts([
+             'post_type'   => 'fs_oferta',
+             'post_parent' => $variantPostId,
+             'meta_query'  => [
+                 'relation' => 'AND',
+                 [
+-                    'key'   => 'fs_merchant_name',
+-                    'value' => $merchantName,
++                    'key'     => 'fs_merchant_name',
++                    'value'   => $merchantName,
++                    'compare' => '=',
+                 ],
+                 [
+-                    'key'   => 'fs_size_eu',
+-                    'value' => $size,
++                    'key'     => 'fs_size_eu',
++                    'value'   => $size,
++                    'compare' => '=',
+                 ],
+             ],
+             'fields'      => 'ids',
+@@ -51,7 +57,7 @@ final class OfferImporter
+             $postId = wp_insert_post([
+                 'post_type'   => 'fs_oferta',
+                 'post_status' => 'publish',
+-                'post_title'  => trim($merchantName . ' · ' . $size),
++                'post_title'  => $merchantName . ' · ' . $size,
+                 'post_parent' => $variantPostId,
+             ]);
+         }
+@@ -60,14 +66,18 @@ final class OfferImporter
+             return 0;
+         }
+ 
+-        // =========================
+-        // ACF / META (ACF optional)
+-        // =========================
++        /*
++        |--------------------------------------------------------------------------
++        | Writer (ACF compatible)
++        |--------------------------------------------------------------------------
++        */
++
+         $writer = static function (string $key, mixed $value) use ($postId): void {
+             if (function_exists('update_field')) {
+                 update_field($key, $value, $postId);
+                 return;
+             }
++
+             update_post_meta($postId, $key, $value);
+         };
+ 
+@@ -88,13 +98,16 @@ final class OfferImporter
+             $writer('fs_tracking_url', (string) $offer->trackingUrl);
+         }
+ 
+-        // =========================
+-        // TAXONOMÍAS
+-        // =========================
++        /*
++        |--------------------------------------------------------------------------
++        | Taxonomías
++        |--------------------------------------------------------------------------
++        */
++
+         TaxonomyAssigner::setSingle(
+             $postId,
+             'fs_tienda',
+-            sanitize_text_field($merchantName)
++            $merchantName
+         );
+ 
+         TaxonomyAssigner::setSingle(
+diff --git a/plugins/fs-importer-core/src/Importer/VariantImporter.php b/plugins/fs-importer-core/src/Importer/VariantImporter.php
+index b1cbe36..b154b93 100644
+--- a/plugins/fs-importer-core/src/Importer/VariantImporter.php
++++ b/plugins/fs-importer-core/src/Importer/VariantImporter.php
+@@ -88,26 +88,38 @@ final class VariantImporter
+         // TALLAS (solo ofertas con stock)
+         // =========================
+         $sizes = [];
+-
++        
+         if (!empty($variant->offers)) {
+             foreach ($variant->offers as $offer) {
++        
+                 if ($offer->inStock === true && !empty($offer->size)) {
++        
+                     $size = trim((string) $offer->size);
++        
+                     if ($size !== '') {
+-                        $sizes[] = $size;
++                        $sizes[$size] = true;
+                     }
+                 }
+             }
+         }
+-
+-        $sizes = array_values(array_unique($sizes));
+-
++        
++        $sizes = array_keys($sizes);
++        
+         if ($sizes) {
++        
++            // 1️⃣ Guardar taxonomía (para admin y filtros WP)
+             TaxonomyAssigner::setMultiple(
+                 $postId,
+                 'fs_talla_eu',
+                 $sizes
+             );
++        
++            // 2️⃣ Guardar meta agregado (para ProductAggregator)
++            update_post_meta(
++                $postId,
++                'fs_size_eu',
++                $sizes
++            );
+         }
+ 
+         return $postId;
+diff --git a/plugins/fs-importer-core/src/Normalizer/SizeNormalizer.php b/plugins/fs-importer-core/src/Normalizer/SizeNormalizer.php
+index 4e36229..9db67fa 100644
+--- a/plugins/fs-importer-core/src/Normalizer/SizeNormalizer.php
++++ b/plugins/fs-importer-core/src/Normalizer/SizeNormalizer.php
+@@ -5,7 +5,7 @@ namespace FS\ImporterCore\Normalizer;
+ 
+ final class SizeNormalizer
+ {
+-    public static function normalize($raw): ?float
++    public static function normalize(mixed $raw): ?string
+     {
+         if (!$raw) {
+             return null;
+@@ -20,57 +20,72 @@ final class SizeNormalizer
+         // Soporte unicode fracciones (½, ⅓, ⅔)
+         $value = str_replace(['½', '⅓', '⅔'], [' 1/2', ' 1/3', ' 2/3'], $value);
+ 
++        $eu = null;
++
+         // 42 2/3 o 42-2/3
+         if (preg_match('~^(\d+)[\s\-]+(\d)/(\d)$~', $value, $m)) {
++
+             $base = (float) $m[1];
+             $num  = (float) $m[2];
+             $den  = (float) $m[3];
+ 
+             if ($den > 0) {
+-                return round($base + ($num / $den), 2);
++                $eu = round($base + ($num / $den), 2);
+             }
+         }
+ 
+         // 44 1/2
+-        if (preg_match('~^(\d+)[\s\-]+1/2$~', $value, $m)) {
+-            return (float)$m[1] + 0.5;
++        elseif (preg_match('~^(\d+)[\s\-]+1/2$~', $value, $m)) {
++            $eu = (float)$m[1] + 0.5;
+         }
+ 
+         // UK conversion
+-        if (str_contains($value, 'uk')) {
++        elseif (str_contains($value, 'uk')) {
+             $num = (float) preg_replace('~[^0-9\.]~', '', $value);
+-
+             if ($num > 0) {
+-                return self::ukToEu($num);
++                $eu = self::ukToEu($num);
+             }
+         }
+ 
+         // US conversion
+-        if (str_contains($value, 'us')) {
++        elseif (str_contains($value, 'us')) {
+             $num = (float) preg_replace('~[^0-9\.]~', '', $value);
+-
+             if ($num > 0) {
+-                return self::usToEu($num);
++                $eu = self::usToEu($num);
+             }
+         }
+ 
+         // Decimal o entero simple
+-        if (preg_match('~^\d+(\.\d+)?$~', $value)) {
+-            return (float) $value;
++        elseif (preg_match('~^\d+(\.\d+)?$~', $value)) {
++            $eu = (float) $value;
++        }
++
++        if ($eu === null) {
++            return null;
++        }
++
++        /*
++        |--------------------------------------------------------------------------
++        | Normalización final como STRING
++        |--------------------------------------------------------------------------
++        | Evitamos 41.0 → "41"
++        | Mantenemos 42.5 → "42.5"
++        */
++
++       if (floor($eu) === $eu) {
++            return (string) (int) $eu;
+         }
+ 
+-        return null;
++        return rtrim(rtrim((string)$eu, '0'), '.');
+     }
+ 
+     private static function ukToEu(float $uk): float
+     {
+-        // Tabla aproximada adulto masculino
+         return round($uk + 33.5, 2);
+     }
+ 
+     private static function usToEu(float $us): float
+     {
+-        // Tabla aproximada adulto masculino
+         return round($us + 33, 2);
+     }
+ }
+diff --git a/plugins/fs-importer-core/src/Signature/VariantSignature.php b/plugins/fs-importer-core/src/Signature/VariantSignature.php
+index c94c44c..309d1e3 100644
+--- a/plugins/fs-importer-core/src/Signature/VariantSignature.php
++++ b/plugins/fs-importer-core/src/Signature/VariantSignature.php
+@@ -1,27 +1,23 @@
+ <?php
++declare(strict_types=1);
++
+ namespace FS\ImporterCore\Signature;
+ 
+ use FS\ImporterCore\Normalizer\TextNormalizer;
+ 
+-/**final class VariantSignature
+-{
+-    public static function make(
+-        string $productId,
+-        ?string $gtin,
+-        string $colorBase
+-    ): string {
+-        if ($gtin) {
+-            return sha1($gtin);
+-        }
+-
+-        $color = TextNormalizer::normalize($colorBase);
+-
+-        return sha1($productId . '|' . $color);
+-    }
+-}
+-
+-**/
+-
++defined('ABSPATH') || exit;
++
++/**
++ * VariantSignature
++ *
++ * Arquitectura:
++ * - Variante = Color (no talla)
++ * - Oferta   = Talla + Merchant + Precio
++ *
++ * Nota:
++ * - GTIN suele identificar SKU (a menudo talla específica). Si lo usas aquí,
++ *   fragmentas variantes y rompes el modelo (variante por talla).
++ */
+ final class VariantSignature
+ {
+     public static function make(
+@@ -29,16 +25,10 @@ final class VariantSignature
+         ?string $gtin,
+         string $colorBase
+     ): string {
++        $pid   = strtolower(trim($productId));
++        $color = strtolower(trim(TextNormalizer::normalize($colorBase)));
+ 
+-        // SI HAY GTIN, usarlo SIEMPRE (Sprinter lo usa como identificador único)
+-        if (!empty($gtin)) {
+-            return sha1(strtolower(trim($gtin)));
+-        }
+-
+-        // Si no hay GTIN, construir firma alternativa estable
+-        return sha1(
+-            strtolower(trim($productId)) . '|' . 
+-            strtolower(trim(TextNormalizer::normalize($colorBase)))
+-        );
++        // Firma estable solo por producto + color (modelo correcto)
++        return sha1($pid . '|' . $color);
+     }
+ }
+diff --git a/plugins/fs-importer-sprinter/fs-importer-sprinter.php b/plugins/fs-importer-sprinter/fs-importer-sprinter.php
+index 40bfa01..a625d25 100644
+--- a/plugins/fs-importer-sprinter/fs-importer-sprinter.php
++++ b/plugins/fs-importer-sprinter/fs-importer-sprinter.php
+@@ -21,14 +21,20 @@ define('FS_SPRINTER_URL', plugin_dir_url(__FILE__));
+  * Evita falsos negativos por orden de carga o renombrados.
+  */
+ add_action('plugins_loaded', static function (): void {
+-    if (!class_exists(\FS\ImporterCore\Plugin::class)) {
++
++    if (!defined('FS_IMPORTER_CORE_VERSION')) {
++
+         add_action('admin_notices', static function (): void {
+             echo '<div class="notice notice-error"><p>';
+             echo '<strong>FS Importer – Sprinter</strong> requiere que el plugin <strong>FS Importer Core</strong> esté activo.';
+             echo '</p></div>';
+         });
++
++        return;
+     }
+-});
++
++}, 20);
++
+ 
+ // =========================
+ // AUTOLOAD COMPOSER
+diff --git a/plugins/fs-importer-sprinter/src/Feed/SprinterMapper.php b/plugins/fs-importer-sprinter/src/Feed/SprinterMapper.php
+index 66d058b..7263117 100644
+--- a/plugins/fs-importer-sprinter/src/Feed/SprinterMapper.php
++++ b/plugins/fs-importer-sprinter/src/Feed/SprinterMapper.php
+@@ -160,7 +160,7 @@ final class SprinterMapper
+                 $offer->merchantName = $merchantName;
+                 $offer->merchantId   = $merchantId;
+                 $offer->price        = $price;
+-                $offer->size         = $size;
++                $offer->size = (string) $size;
+                 $offer->inStock      = true;
+ 
+                 $variant->offers[] = $offer;
+diff --git a/plugins/fs-shortcode-suite/fs-shortcode-suite.php b/plugins/fs-shortcode-suite/fs-shortcode-suite.php
+index f92467f..c0a1af6 100644
+--- a/plugins/fs-shortcode-suite/fs-shortcode-suite.php
++++ b/plugins/fs-shortcode-suite/fs-shortcode-suite.php
+@@ -4,7 +4,7 @@
+  * Plugin URI: https://botasfutsal.com
+  * Description: Motor profesional de shortcodes optimizados para BOTASFUTSAL.
+  * Version: 1.0.0
+- * Author: Vidal Joven Montull
++ * Author: Vidal Joven 
+  * Author URI: https://botasfutsal.com
+  * Text Domain: fs-shortcode-suite
+  */
+diff --git a/plugins/fs-shortcode-suite/includes/Admin/Admin_Menu.php b/plugins/fs-shortcode-suite/includes/Admin/Admin_Menu.php
+index dfbd93f..6e4385d 100644
+--- a/plugins/fs-shortcode-suite/includes/Admin/Admin_Menu.php
++++ b/plugins/fs-shortcode-suite/includes/Admin/Admin_Menu.php
+@@ -5,6 +5,7 @@ namespace FS\ShortcodeSuite\Admin;
+ 
+ use FS\ShortcodeSuite\Admin\Pages\Dashboard_Page;
+ use FS\ShortcodeSuite\Admin\Pages\Grid_Page;
++use FS\ShortcodeSuite\Admin\Pages\Search_Page;
+ use FS\ShortcodeSuite\Admin\Pages\Settings_Page;
+ use FS\ShortcodeSuite\Admin\Pages\System_Page;
+ 
+@@ -19,16 +20,22 @@ final class Admin_Menu {
+ 
+     public function register_menu(): void {
+ 
++        /**
++         * Menu principal SIN callback (solo contenedor)
++         */
+         add_menu_page(
+             'FS Shortcode Suite',
+             'FS Shortcodes',
+             'manage_options',
+             'fs-shortcode-suite',
+-            [new Dashboard_Page(), 'render'],
++            '__return_null', // 🔥 clave para evitar doble render
+             'dashicons-screenoptions',
+             58
+         );
+ 
++        /**
++         * Submenu real Dashboard
++         */
+         add_submenu_page(
+             'fs-shortcode-suite',
+             'Dashboard',
+@@ -47,6 +54,24 @@ final class Admin_Menu {
+             [new Grid_Page(), 'render']
+         );
+ 
++        add_submenu_page(
++            'fs-shortcode-suite',
++            'FS Search',
++            'FS Search',
++            'manage_options',
++            'fs-shortcode-suite-search',
++            [new Search_Page(), 'render']
++        );
++
++        add_submenu_page(
++            'fs-shortcode-suite',
++            'Size Guide',
++            'Size Guide',
++            'manage_options',
++            'fs-shortcode-suite-size-guide',
++            [new \FS\ShortcodeSuite\Admin\Pages\Size_Guide_Page(), 'render']
++        );
++        
+         add_submenu_page(
+             'fs-shortcode-suite',
+             'Settings',
+diff --git a/plugins/fs-shortcode-suite/includes/Admin/Assets/admin.css b/plugins/fs-shortcode-suite/includes/Admin/Assets/admin.css
+index 34b71ce..5cb92f0 100644
+--- a/plugins/fs-shortcode-suite/includes/Admin/Assets/admin.css
++++ b/plugins/fs-shortcode-suite/includes/Admin/Assets/admin.css
+@@ -1,88 +1,346 @@
++/* Admin UI - scoped */
+ .fs-admin-wrap {
+-    padding: 40px;
+-    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
++  padding-top: 12px;
++}
++
++.fs-admin-header {
++  margin: 10px 0 18px;
++}
++
++.fs-admin-header__title {
++  display: flex;
++  align-items: center;
++  gap: 10px;
++  margin-bottom: 6px;
+ }
+ 
+ .fs-admin-header h1 {
+-    font-size: 26px;
+-    margin-bottom: 6px;
++  font-size: 28px;
++  line-height: 1.1;
++  margin: 0;
+ }
+ 
+ .fs-admin-header p {
+-    color: #666;
+-    margin-bottom: 30px;
++  color: #606a73;
++  margin: 0;
++  max-width: 980px;
++}
++
++/* Shell layout */
++.fs-admin-shell {
++  display: grid;
++  gap: 16px;
++}
++
++.fs-admin-shell--2col {
++  grid-template-columns: 1.15fr 0.85fr;
++}
++
++@media (max-width: 1100px) {
++  .fs-admin-shell--2col {
++    grid-template-columns: 1fr;
++  }
++}
++
++/* Card */
++.fs-card {
++  background: #fff;
++  border: 1px solid #e6e8eb;
++  border-radius: 12px;
++  padding: 18px;
++}
++
++.fs-card__header {
++  margin-bottom: 14px;
++}
++
++.fs-card__title {
++  font-size: 16px;
++  margin: 0 0 6px;
++}
++
++.fs-card__subtitle {
++  margin: 0;
++  color: #6b7280;
++  font-size: 13px;
++}
++
++/* Badges / pills */
++.fs-badge {
++  display: inline-flex;
++  align-items: center;
++  gap: 6px;
++  font-size: 12px;
++  padding: 3px 8px;
++  border-radius: 999px;
++  border: 1px solid #e6e8eb;
++  background: #fff;
+ }
+ 
+-.fs-admin-card {
+-    background: #fff;
+-    padding: 40px;
+-    border-radius: 12px;
+-    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+-    max-width: 900px;
++.fs-badge--muted {
++  color: #6b7280;
++  background: #f8fafc;
+ }
+ 
+-.fs-admin-card h2 {
+-    margin-bottom: 24px;
++.fs-pill {
++  display: inline-flex;
++  align-items: center;
++  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
++  font-size: 12px;
++  padding: 4px 8px;
++  border-radius: 999px;
++  background: #f1f5f9;
++  border: 1px solid #e6e8eb;
+ }
+ 
++/* Form grid */
+ .fs-form-grid {
+-    display: grid;
+-    grid-template-columns: repeat(2, 1fr);
+-    gap: 24px;
+-    margin-bottom: 30px;
++  display: grid;
++  grid-template-columns: repeat(2, minmax(0, 1fr));
++  gap: 14px;
++  margin: 12px 0 14px;
++}
++
++@media (max-width: 900px) {
++  .fs-form-grid {
++    grid-template-columns: 1fr;
++  }
+ }
+ 
+ .fs-field label {
+-    display: block;
+-    font-weight: 600;
+-    margin-bottom: 6px;
++  display: block;
++  font-weight: 600;
++  margin-bottom: 6px;
+ }
+ 
+ .fs-field input {
+-    width: 100%;
+-    padding: 10px 12px;
+-    border-radius: 6px;
+-    border: 1px solid #ddd;
+-    font-size: 14px;
++  width: 100%;
++  padding: 10px 12px;
++  border-radius: 8px;
++  border: 1px solid #d6dbe1;
++  font-size: 14px;
++  background: #fff;
++}
++
++.fs-field input:focus {
++  outline: none;
++  border-color: #2271b1;
++  box-shadow: 0 0 0 2px rgba(34, 113, 177, 0.15);
++}
++
++.fs-help {
++  margin: 6px 0 0;
++  font-size: 12px;
++  color: #6b7280;
++}
++
++/* Actions */
++.fs-actions {
++  display: flex;
++  align-items: center;
++  gap: 10px;
++  margin-top: 10px;
+ }
+ 
++/* Keep your class, but make it WP-friendly */
+ .fs-btn-primary {
+-    background: #111;
+-    color: #fff;
+-    padding: 12px 20px;
+-    border-radius: 6px;
+-    border: none;
+-    cursor: pointer;
+-    font-weight: 600;
+-    margin-bottom: 30px;
++  border-radius: 10px !important;
++  padding: 10px 14px !important;
++  font-weight: 600 !important;
+ }
+ 
+-.fs-btn-primary:hover {
+-    background: #000;
++/* Output */
++.fs-output {
++  margin-top: 16px;
++}
++
++.fs-output__top {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  margin-bottom: 8px;
+ }
+ 
+ .fs-output label {
+-    display: block;
+-    margin-bottom: 8px;
+-    font-weight: 600;
++  font-weight: 600;
+ }
+ 
+ .fs-code-box {
+-    background: #f5f5f5;
+-    padding: 14px;
+-    border-radius: 6px;
+-    font-family: monospace;
+-    margin-bottom: 12px;
++  background: #0b1220;
++  color: #e5e7eb;
++  padding: 12px 14px;
++  border-radius: 10px;
++  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
++  font-size: 13px;
++  overflow: auto;
++  margin: 0 0 10px;
+ }
+ 
+ .fs-copy-btn {
+-    background: #e5e5e5;
+-    border: none;
+-    padding: 8px 14px;
+-    border-radius: 6px;
+-    cursor: pointer;
++  border-radius: 10px !important;
++}
++
++/* Docs */
++.fs-doc h3 {
++  margin: 14px 0 8px;
++  font-size: 14px;
++}
++
++.fs-snippet {
++  background: #f8fafc;
++  border: 1px solid #e6e8eb;
++  padding: 10px 12px;
++  border-radius: 10px;
++  margin: 8px 0;
++}
++
++.fs-snippet code {
++  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
++  font-size: 12.5px;
++}
++
++.fs-list {
++  margin: 8px 0 0 18px;
++  color: #374151;
++}
++
++.fs-callout {
++  margin-top: 14px;
++  padding: 12px 12px;
++  border-radius: 10px;
++  border: 1px solid #e6e8eb;
++  background: #f8fafc;
++  color: #374151;
++  font-size: 13px;
++}
++
++.fs-table {
++  margin-top: 10px;
++}
++
++/* Tiles */
++.fs-tiles {
++  display: grid;
++  grid-template-columns: repeat(2, minmax(0, 1fr));
++  gap: 12px;
++  margin-top: 12px;
++}
++
++@media (max-width: 900px) {
++  .fs-tiles {
++    grid-template-columns: 1fr;
++  }
++}
++
++.fs-tile {
++  display: block;
++  padding: 14px;
++  border-radius: 12px;
++  border: 1px solid #e6e8eb;
++  background: #fff;
++  text-decoration: none;
++  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
++}
++
++.fs-tile:hover {
++  border-color: #d6dbe1;
++  box-shadow: 0 10px 22px rgba(0,0,0,0.06);
++  transform: translateY(-1px);
++}
++
++.fs-tile__top {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 10px;
++  margin-bottom: 6px;
++}
++
++.fs-tile h3 {
++  margin: 0;
++  font-size: 14px;
++  color: #111827;
++}
++
++.fs-tile p {
++  margin: 0;
++  color: #6b7280;
++  font-size: 13px;
++}
++
++/* Divider */
++.fs-divider {
++  margin: 18px 0;
++  border: 0;
++  border-top: 1px solid #e6e8eb;
++}
++/* ================================
++   BRANDING
++================================ */
++
++:root {
++  --fs-green-light: #7AC70C;   /* verde lima */
++  --fs-green-dark:  #5FA104;   /* verde profundo */
++  --fs-blue-dark:   #1F2A3F;   /* azul marino */
++  --fs-blue-soft:   #6B7A8F;   /* gris azulado */
++  --fs-yellow:      #F2C14E;   /* mostaza */
++  --fs-black:       #000000;
++}
++
++.fs-admin-header--brand {
++  background: linear-gradient(
++      135deg,
++      var(--fs-green-light),
++      var(--fs-green-dark)
++  );
++  color: #fff;
++  padding: 24px;
++  border-radius: 18px;
++  border: none;
++  display: flex;
++  align-items: center;
++  gap: 18px;
++}
++
++.fs-admin-header--brand h1 {
++  color: #fff;
++}
++
++.fs-admin-header--brand p {
++  color: rgba(255,255,255,0.85);
++}
++
++.fs-admin-logo-wrapper {
++  flex-shrink: 0;
++}
++
++.fs-admin-logo {
++  max-width: 120px;
++  height: auto;
++}
++
++.fs-badge--brand {
++  background: var(--fs-yellow);
++  color: var(--fs-blue-dark);
++  font-weight: 600;
++  border: none;
++}
++
++/* Brand buttons */
++.fs-btn-primary {
++  background: var(--fs-blue-dark) !important;
++  border-color: var(--fs-blue-dark) !important;
++  color: #fff !important;
++}
++
++.fs-btn-primary:hover {
++  background: var(--fs-black) !important;
++  border-color: var(--fs-black) !important;
++  opacity: .9;
+ }
+ 
+-.fs-copy-btn:hover {
+-    background: #ddd;
++/* Tile hover brand accent */
++.fs-tile:hover {
++  border-color: var(--fs-green-light);
++  box-shadow: 0 8px 20px rgba(31,42,63,0.12);
+ }
+diff --git a/plugins/fs-shortcode-suite/includes/Admin/Assets/admin.js b/plugins/fs-shortcode-suite/includes/Admin/Assets/admin.js
+index 67c5c47..bafe1fb 100644
+--- a/plugins/fs-shortcode-suite/includes/Admin/Assets/admin.js
++++ b/plugins/fs-shortcode-suite/includes/Admin/Assets/admin.js
+@@ -1,39 +1,97 @@
+ document.addEventListener('DOMContentLoaded', () => {
+ 
+-    const generateBtn = document.getElementById('fs-generate');
+-    const outputBox = document.getElementById('fs-output');
+-    const copyBtn = document.getElementById('fs-copy');
++  /**
++   * Generic clipboard helper
++   */
++  const copyText = async (text) => {
++    if (!text) return false;
++    try {
++      await navigator.clipboard.writeText(text);
++      return true;
++    } catch (e) {
++      return false;
++    }
++  };
+ 
++  /**
++   * FS Grid shortcode generator (only if present)
++   */
++  const generateBtn = document.getElementById('fs-generate');
++  const outputBox = document.getElementById('fs-output');
++
++  if (generateBtn && outputBox) {
+     generateBtn.addEventListener('click', () => {
++      const brand = (document.getElementById('fs-brand')?.value || '').trim();
++      const color = (document.getElementById('fs-color')?.value || '').trim();
++      const gender = (document.getElementById('fs-gender')?.value || '').trim();
++      const age = (document.getElementById('fs-age')?.value || '').trim();
++      const size = (document.getElementById('fs-size')?.value || '').trim();
++      const perpage = (document.getElementById('fs-perpage')?.value || '').trim();
++
++      let shortcode = '[fs_grid';
++
++      if (brand) shortcode += ` brand="${brand}"`;
++      if (color) shortcode += ` color="${color}"`;
++      if (gender) shortcode += ` gender="${gender}"`;
++      if (age) shortcode += ` age_group="${age}"`;
++      if (size) shortcode += ` size="${size}"`;
++      if (perpage) shortcode += ` per_page="${perpage}"`;
++
++      shortcode += ']';
+ 
+-        const brand = document.getElementById('fs-brand').value.trim();
+-        const color = document.getElementById('fs-color').value.trim();
+-        const gender = document.getElementById('fs-gender').value.trim();
+-        const age = document.getElementById('fs-age').value.trim();
+-        const size = document.getElementById('fs-size').value.trim();
+-        const perpage = document.getElementById('fs-perpage').value.trim();
++      outputBox.textContent = shortcode;
++    });
++  }
+ 
+-        let shortcode = '[fs_grid';
++  /**
++   * Generic copy buttons: data-fs-copy="#selector"
++   */
++  document.querySelectorAll('[data-fs-copy]').forEach((btn) => {
++    btn.addEventListener('click', async () => {
++      const selector = btn.getAttribute('data-fs-copy');
++      const target = selector ? document.querySelector(selector) : null;
++      const label = btn.getAttribute('data-fs-copy-label') || 'Copiar';
++      const done = btn.getAttribute('data-fs-copy-done') || 'Copiado ✓';
+ 
+-        if (brand) shortcode += ` brand="${brand}"`;
+-        if (color) shortcode += ` color="${color}"`;
+-        if (gender) shortcode += ` gender="${gender}"`;
+-        if (age) shortcode += ` age_group="${age}"`;
+-        if (size) shortcode += ` size="${size}"`;
+-        if (perpage) shortcode += ` per_page="${perpage}"`;
++      if (!target) return;
+ 
+-        shortcode += ']';
++      const ok = await copyText(target.textContent || '');
++      if (!ok) return;
+ 
+-        outputBox.textContent = shortcode;
++      btn.textContent = done;
++      setTimeout(() => {
++        btn.textContent = label;
++      }, 1400);
+     });
++  });
++
++  /**
++   * System info copy (no inline script)
++   */
++  const sysBtn = document.querySelector('[data-fs-copy-system="1"]');
++  if (sysBtn) {
++    sysBtn.addEventListener('click', async () => {
++      const rows = document.querySelectorAll('.fs-admin-wrap .widefat tbody tr');
++      let text = '';
++
++      rows.forEach((row) => {
++        const cells = row.querySelectorAll('td');
++        if (cells.length === 2) {
++          text += `${cells[0].innerText}: ${cells[1].innerText}\n`;
++        }
++      });
++
++      const label = sysBtn.getAttribute('data-fs-copy-label') || 'Copiar información';
++      const done = sysBtn.getAttribute('data-fs-copy-done') || 'Copiado ✔';
+ 
+-    copyBtn.addEventListener('click', () => {
+-        navigator.clipboard.writeText(outputBox.textContent);
+-        copyBtn.textContent = "Copiado ✓";
++      const ok = await copyText(text.trim());
++      if (!ok) return;
+ 
+-        setTimeout(() => {
+-            copyBtn.textContent = "Copiar";
+-        }, 1500);
++      sysBtn.textContent = done;
++      setTimeout(() => {
++        sysBtn.textContent = label;
++      }, 1600);
+     });
++  }
+ 
+ });
+diff --git a/plugins/fs-shortcode-suite/includes/Admin/Pages/Dashboard_Page.php b/plugins/fs-shortcode-suite/includes/Admin/Pages/Dashboard_Page.php
+index f38a7a8..70c03a0 100644
+--- a/plugins/fs-shortcode-suite/includes/Admin/Pages/Dashboard_Page.php
++++ b/plugins/fs-shortcode-suite/includes/Admin/Pages/Dashboard_Page.php
+@@ -8,24 +8,107 @@ defined('ABSPATH') || exit;
+ final class Dashboard_Page {
+ 
+     public function render(): void {
+-        ?>
+-        <div class="fs-admin-wrap">
+-            <div class="fs-admin-header">
+-                <h1>FS Shortcode Suite</h1>
+-                <p>Arquitectura modular de shortcodes optimizados.</p>
+-            </div>
+ 
+-            <div class="fs-admin-card">
+-                <h2>Shortcodes disponibles</h2>
++        $logo_post_id = 41;
++        $logo_html = '';
++        
++        $post = get_post($logo_post_id);
++        
++        if ($post) {
++        
++            // Caso 1: Es un attachment
++            if ($post->post_type === 'attachment') {
++        
++                $logo_html = wp_get_attachment_image(
++                    $logo_post_id,
++                    'medium',
++                    false,
++                    [
++                        'class'   => 'fs-admin-logo',
++                        'alt'     => 'FS Logo',
++                        'loading' => 'lazy',
++                    ]
++                );
++        
++            }
++            // Caso 2: Tiene imagen destacada
++            elseif (has_post_thumbnail($logo_post_id)) {
++        
++                $logo_html = get_the_post_thumbnail(
++                    $logo_post_id,
++                    'medium',
++                    [
++                        'class'   => 'fs-admin-logo',
++                        'alt'     => 'FS Logo',
++                        'loading' => 'lazy',
++                    ]
++                );
++            }
++        }
+ 
+-                <div class="fs-admin-grid">
+-                    <a href="<?php echo admin_url('admin.php?page=fs-shortcode-suite-grid'); ?>" class="fs-admin-tile">
+-                        <h3>FS Grid</h3>
+-                        <p>Grid offer-driven con filtros dinámicos.</p>
+-                    </a>
++    
++        ?>
++        <div class="wrap fs-admin-wrap">
++    
++            <div class="fs-admin-header fs-admin-header--brand">
++    
++                <div class="fs-admin-header__brand">
++    
++                    <?php if ($logo_html) : ?>
++                        <div class="fs-admin-logo-wrapper">
++                            <?php echo $logo_html; ?>
++                        </div>
++                    <?php endif; ?>
++    
++                    <div>
++                        <div class="fs-admin-header__title">
++                            <h1>FS Shortcode Suite</h1>
++                            <span class="fs-badge fs-badge--brand">Admin</span>
++                        </div>
++                        <p>Arquitectura modular de shortcodes optimizados.</p>
++                    </div>
++    
+                 </div>
++    
+             </div>
++    
++            <div class="fs-admin-shell">
++                <div class="fs-card">
++                    <div class="fs-card__header">
++                        <h2 class="fs-card__title">Shortcodes disponibles</h2>
++                        <p class="fs-card__subtitle">Accede a cada generador y a su manual de uso.</p>
++                    </div>
++    
++                    <div class="fs-tiles">
++                        <a href="<?php echo esc_url(admin_url('admin.php?page=fs-shortcode-suite-grid')); ?>" class="fs-tile">
++                            <div class="fs-tile__top">
++                                <h3>FS Grid</h3>
++                                <span class="fs-pill">[fs_grid]</span>
++                            </div>
++                            <p>Grid offer-driven con sincronización dinámica.</p>
++                        </a>
++    
++                        <a href="<?php echo esc_url(admin_url('admin.php?page=fs-shortcode-suite-search')); ?>" class="fs-tile">
++                            <div class="fs-tile__top">
++                                <h3>FS Search</h3>
++                                <span class="fs-pill">[fs_search]</span>
++                            </div>
++                            <p>Búsqueda fullscreen con REST.</p>
++                        </a>
++                        
++                        <a href="<?php echo esc_url(admin_url('admin.php?page=fs-shortcode-suite-size-guide')); ?>" class="fs-tile">
++                            <div class="fs-tile__top">
++                                <h3>FS Size Guide</h3>
++                                <span class="fs-pill">[fs_size_guide]</span>
++                            </div>
++                            <p>Búsqueda fullscreen con REST.</p>
++                        </a>
++                    </div>
++                </div>
++            </div>
++    
+         </div>
+         <?php
+     }
++
+ }
+diff --git a/plugins/fs-shortcode-suite/includes/Admin/Pages/Grid_Page.php b/plugins/fs-shortcode-suite/includes/Admin/Pages/Grid_Page.php
+index be0bf41..16841cd 100644
+--- a/plugins/fs-shortcode-suite/includes/Admin/Pages/Grid_Page.php
++++ b/plugins/fs-shortcode-suite/includes/Admin/Pages/Grid_Page.php
+@@ -9,60 +9,133 @@ final class Grid_Page {
+ 
+     public function render(): void {
+         ?>
+-        <div class="fs-admin-wrap">
+-            <div class="fs-admin-header">
+-                <h1>FS Grid</h1>
+-                <p>Generador profesional del shortcode [fs_grid]</p>
++        <div class="wrap fs-admin-wrap">
++            <div class="fs-admin-header fs-admin-header--brand">
++                <div class="fs-admin-header__title">
++                    <h1>FS Grid</h1>
++                    <span class="fs-pill">[fs_grid]</span>
++                </div>
++                <p>Generador del shortcode con atributos. Copia y pega en cualquier página o bloque “Shortcode”.</p>
+             </div>
+ 
+-            <div class="fs-admin-card">
+-
+-                <h2>Generador de shortcode</h2>
++            <div class="fs-admin-shell fs-admin-shell--2col">
+ 
+-                <div class="fs-form-grid">
+-                    <div class="fs-field">
+-                        <label>Brand</label>
+-                        <input type="text" id="fs-brand" placeholder="nike, adidas..." />
++                <div class="fs-card">
++                    <div class="fs-card__header">
++                        <h2 class="fs-card__title">Generador de shortcode</h2>
++                        <p class="fs-card__subtitle">Rellena solo lo que necesites. Los campos vacíos no se incluyen.</p>
+                     </div>
+ 
+-                    <div class="fs-field">
+-                        <label>Color</label>
+-                        <input type="text" id="fs-color" placeholder="negro, blanco..." />
+-                    </div>
++                    <div class="fs-form-grid">
++                        <div class="fs-field">
++                            <label for="fs-brand">Brand</label>
++                            <input type="text" id="fs-brand" placeholder="nike, adidas..." />
++                            <p class="fs-help">Slug o lista separada por comas.</p>
++                        </div>
+ 
+-                    <div class="fs-field">
+-                        <label>Gender</label>
+-                        <input type="text" id="fs-gender" placeholder="hombre, mujer..." />
+-                    </div>
++                        <div class="fs-field">
++                            <label for="fs-color">Color</label>
++                            <input type="text" id="fs-color" placeholder="negro, blanco..." />
++                            <p class="fs-help">Slug o lista separada por comas.</p>
++                        </div>
++
++                        <div class="fs-field">
++                            <label for="fs-gender">Gender</label>
++                            <input type="text" id="fs-gender" placeholder="hombre, mujer..." />
++                            <p class="fs-help">Valores esperados: hombre, mujer, unisex.</p>
++                        </div>
++
++                        <div class="fs-field">
++                            <label for="fs-age">Age Group</label>
++                            <input type="text" id="fs-age" placeholder="adult, infantil..." />
++                            <p class="fs-help">Valores esperados: adult, infantil.</p>
++                        </div>
++
++                        <div class="fs-field">
++                            <label for="fs-size">Size</label>
++                            <input type="text" id="fs-size" placeholder="42..." />
++                            <p class="fs-help">Talla EU (ej: 42) o lista por comas.</p>
++                        </div>
+ 
+-                    <div class="fs-field">
+-                        <label>Age Group</label>
+-                        <input type="text" id="fs-age" placeholder="adult, infantil..." />
++                        <div class="fs-field">
++                            <label for="fs-perpage">Per Page</label>
++                            <input type="number" id="fs-perpage" value="12" min="1" max="48" />
++                            <p class="fs-help">Recomendado: 8–16 para rendimiento.</p>
++                        </div>
+                     </div>
+ 
+-                    <div class="fs-field">
+-                        <label>Size</label>
+-                        <input type="text" id="fs-size" placeholder="42..." />
++                    <div class="fs-actions">
++                        <button class="button button-primary fs-btn-primary" id="fs-generate" type="button">
++                            Generar shortcode
++                        </button>
+                     </div>
+ 
+-                    <div class="fs-field">
+-                        <label>Per Page</label>
+-                        <input type="number" id="fs-perpage" value="12" min="1" max="48" />
++                    <div class="fs-output">
++                        <div class="fs-output__top">
++                            <label>Shortcode generado</label>
++                            <span class="fs-badge fs-badge--muted">Listo para copiar</span>
++                        </div>
++
++                        <pre class="fs-code-box" id="fs-output">[fs_grid]</pre>
++
++                        <button
++                            class="button fs-copy-btn"
++                            id="fs-copy"
++                            type="button"
++                            data-fs-copy="#fs-output"
++                            data-fs-copy-label="Copiar"
++                            data-fs-copy-done="Copiado ✓"
++                        >Copiar</button>
+                     </div>
+                 </div>
+ 
+-                <button class="fs-btn-primary" id="fs-generate">
+-                    Generar shortcode
+-                </button>
++                <div class="fs-card">
++                    <div class="fs-card__header">
++                        <h2 class="fs-card__title">Manual rápido</h2>
++                        <p class="fs-card__subtitle">Uso, ejemplos y recomendaciones de configuración.</p>
++                    </div>
++
++                    <div class="fs-doc">
++                        <h3>Uso básico</h3>
++                        <p>Pega el shortcode en una página o en un bloque “Shortcode”.</p>
++
++                        <div class="fs-snippet">
++                            <code>[fs_grid]</code>
++                        </div>
++
++                        <h3>Ejemplos</h3>
++                        <div class="fs-snippet">
++                            <code>[fs_grid brand="nike" per_page="12"]</code>
++                        </div>
++                        <div class="fs-snippet">
++                            <code>[fs_grid gender="hombre" age_group="adult" per_page="8"]</code>
++                        </div>
++                        <div class="fs-snippet">
++                            <code>[fs_grid color="negro,blanco" size="42,43"]</code>
++                        </div>
++
++                        <h3>Atributos</h3>
++                        <table class="widefat striped fs-table">
++                            <thead>
++                                <tr>
++                                    <th>Atributo</th>
++                                    <th>Descripción</th>
++                                </tr>
++                            </thead>
++                            <tbody>
++                                <tr><td><code>brand</code></td><td>Filtra por marca (slug o lista por comas).</td></tr>
++                                <tr><td><code>color</code></td><td>Filtra por color (slug o lista por comas).</td></tr>
++                                <tr><td><code>gender</code></td><td>Filtra por género (hombre, mujer, unisex).</td></tr>
++                                <tr><td><code>age_group</code></td><td>Filtra por grupo de edad (adult, infantil).</td></tr>
++                                <tr><td><code>size</code></td><td>Filtra por talla EU (ej: 42) o lista por comas.</td></tr>
++                                <tr><td><code>per_page</code></td><td>Número de items por página (1–48).</td></tr>
++                            </tbody>
++                        </table>
+ 
+-                <div class="fs-output">
+-                    <label>Shortcode:</label>
+-                    <div class="fs-code-box" id="fs-output">
+-                        [fs_grid]
++                        <div class="fs-callout">
++                            <strong>Rendimiento:</strong> evita <code>per_page</code> alto en páginas con mucho contenido.
++                        </div>
+                     </div>
+-                    <button class="fs-copy-btn" id="fs-copy">
+-                        Copiar
+-                    </button>
+                 </div>
+ 
+             </div>
+diff --git a/plugins/fs-shortcode-suite/includes/Admin/Pages/Search_Page.php b/plugins/fs-shortcode-suite/includes/Admin/Pages/Search_Page.php
+new file mode 100644
+index 0000000..9dd3133
+--- /dev/null
++++ b/plugins/fs-shortcode-suite/includes/Admin/Pages/Search_Page.php
+@@ -0,0 +1,80 @@
++<?php
++declare(strict_types=1);
++
++namespace FS\ShortcodeSuite\Admin\Pages;
++
++defined('ABSPATH') || exit;
++
++final class Search_Page {
++
++    public function render(): void {
++        ?>
++        <div class="wrap fs-admin-wrap">
++            
++            <div class="fs-admin-header fs-admin-header--brand">
++                <div class="fs-admin-header__title">
++                    <h1>FS Search</h1>
++                    <span class="fs-pill">[fs_search]</span>
++                </div>
++                <p>Búsqueda fullscreen con overlay y autocompletado vía REST. Inserta el shortcode donde quieras el trigger.</p>
++            </div>
++
++            <div class="fs-admin-shell fs-admin-shell--2col">
++
++                <div class="fs-card">
++                    <div class="fs-card__header">
++                        <h2 class="fs-card__title">Shortcode</h2>
++                        <p class="fs-card__subtitle">Este shortcode no requiere atributos.</p>
++                    </div>
++
++                    <div class="fs-output">
++                        <div class="fs-output__top">
++                            <label>Shortcode</label>
++                            <span class="fs-badge fs-badge--muted">Listo para copiar</span>
++                        </div>
++
++                        <pre class="fs-code-box" id="fs-search-output">[fs_search]</pre>
++
++                        <button
++                            class="button fs-copy-btn"
++                            type="button"
++                            data-fs-copy="#fs-search-output"
++                            data-fs-copy-label="Copiar"
++                            data-fs-copy-done="Copiado ✓"
++                        >Copiar</button>
++                    </div>
++
++                    <div class="fs-callout">
++                        <strong>Nota:</strong> los assets de búsqueda se encolan solo cuando el shortcode está presente.
++                    </div>
++                </div>
++
++                <div class="fs-card">
++                    <div class="fs-card__header">
++                        <h2 class="fs-card__title">Manual rápido</h2>
++                        <p class="fs-card__subtitle">Uso y consideraciones de configuración.</p>
++                    </div>
++
++                    <div class="fs-doc">
++                        <h3>Uso</h3>
++                        <p>Pega <code>[fs_search]</code> donde quieras el botón trigger (header, sección superior, etc.).</p>
++
++                        <h3>Comportamiento</h3>
++                        <ul class="fs-list">
++                            <li>Abre un overlay fullscreen con input de búsqueda.</li>
++                            <li>Consulta el endpoint REST de búsqueda para autocompletar resultados.</li>
++                            <li>Optimizado para mobile-first.</li>
++                        </ul>
++
++                        <h3>Recomendaciones</h3>
++                        <div class="fs-callout">
++                            <strong>UX:</strong> en desktop suele funcionar mejor junto al grid. En móvil, ideal en el header.
++                        </div>
++                    </div>
++                </div>
++
++            </div>
++        </div>
++        <?php
++    }
++}
+diff --git a/plugins/fs-shortcode-suite/includes/Admin/Pages/Settings_Page.php b/plugins/fs-shortcode-suite/includes/Admin/Pages/Settings_Page.php
+index 4eb8ab9..29ba380 100644
+--- a/plugins/fs-shortcode-suite/includes/Admin/Pages/Settings_Page.php
++++ b/plugins/fs-shortcode-suite/includes/Admin/Pages/Settings_Page.php
+@@ -23,8 +23,9 @@ final class Settings_Page {
+ 
+         <div class="fs-admin-wrap">
+ 
+-            <div class="fs-admin-header">
++            <div class="fs-admin-header fs-admin-header--brand">
+                 <h1>Settings</h1>
++                    <span class="fs-badge fs-badge--muted">Settings</span>
+                 <p>Configuración global del motor FS Shortcode Suite.</p>
+             </div>
+ 
+diff --git a/plugins/fs-shortcode-suite/includes/Admin/Pages/Size_Guide_Page.php b/plugins/fs-shortcode-suite/includes/Admin/Pages/Size_Guide_Page.php
+new file mode 100644
+index 0000000..f892a17
+--- /dev/null
++++ b/plugins/fs-shortcode-suite/includes/Admin/Pages/Size_Guide_Page.php
+@@ -0,0 +1,43 @@
++<?php
++declare(strict_types=1);
++
++namespace FS\ShortcodeSuite\Admin\Pages;
++
++defined('ABSPATH') || exit;
++
++final class Size_Guide_Page {
++
++    public function render(): void {
++        ?>
++        <div class="wrap fs-admin-wrap">
++
++            <div class="fs-admin-header fs-admin-header--brand">
++                <div class="fs-admin-header__title">
++                    <h1>Size Guide</h1>
++                    <span class="fs-pill">[fs_size_guide]</span>
++                </div>
++                <p>Shortcode informativo para mostrar enlaces oficiales a guías de tallas.</p>
++            </div>
++
++            <div class="fs-card">
++
++                <div class="fs-card__header">
++                    <h2 class="fs-card__title">Uso</h2>
++                </div>
++
++                <div class="fs-snippet">
++                    <code>[fs_size_guide]</code>
++                </div>
++
++                <p>Pega este shortcode en una página informativa.</p>
++
++                <div class="fs-callout">
++                    Diseño minimalista mobile-first con identidad visual del brand.
++                </div>
++
++            </div>
++
++        </div>
++        <?php
++    }
++}
+diff --git a/plugins/fs-shortcode-suite/includes/Admin/Pages/System_Page.php b/plugins/fs-shortcode-suite/includes/Admin/Pages/System_Page.php
+index 8c66427..10f51f9 100644
+--- a/plugins/fs-shortcode-suite/includes/Admin/Pages/System_Page.php
++++ b/plugins/fs-shortcode-suite/includes/Admin/Pages/System_Page.php
+@@ -11,112 +11,106 @@ final class System_Page {
+ 
+         global $wpdb;
+ 
+-        $memory_limit = ini_get('memory_limit');
+-        $php_version  = phpversion();
+-        $wp_version   = get_bloginfo('version');
++        $memory_limit  = ini_get('memory_limit');
++        $php_version   = phpversion();
++        $wp_version    = get_bloginfo('version');
+         $mysql_version = $wpdb->db_version();
+ 
+         $cache_enabled = function_exists('wp_cache_get') ? 'Sí' : 'No';
+         $rest_enabled  = rest_url() ? 'Sí' : 'No';
+ 
+         ?>
+-        <div class="fs-admin-wrap">
++        <div class="wrap fs-admin-wrap">
+ 
+-            <div class="fs-admin-header">
+-                <h1>System Information</h1>
++            <div class="fs-admin-header fs-admin-header--brand">
++                <div class="fs-admin-header__title">
++                    <h1>System Information</h1>
++                    <span class="fs-badge fs-badge--muted">Diagnóstico</span>
++                </div>
+                 <p>Información técnica del entorno para diagnóstico y soporte.</p>
+             </div>
+ 
+-            <div class="fs-admin-card">
+-
+-                <h2>Entorno del servidor</h2>
+-
+-                <table class="widefat striped" style="margin-top:20px;">
+-                    <tbody>
+-                        <tr>
+-                            <td><strong>Plugin Version</strong></td>
+-                            <td><?php echo esc_html(FS_SC_SUITE_VERSION); ?></td>
+-                        </tr>
+-                        <tr>
+-                            <td><strong>PHP Version</strong></td>
+-                            <td><?php echo esc_html($php_version); ?></td>
+-                        </tr>
+-                        <tr>
+-                            <td><strong>WordPress Version</strong></td>
+-                            <td><?php echo esc_html($wp_version); ?></td>
+-                        </tr>
+-                        <tr>
+-                            <td><strong>MySQL Version</strong></td>
+-                            <td><?php echo esc_html($mysql_version); ?></td>
+-                        </tr>
+-                        <tr>
+-                            <td><strong>Memory Limit</strong></td>
+-                            <td><?php echo esc_html($memory_limit); ?></td>
+-                        </tr>
+-                        <tr>
+-                            <td><strong>REST API disponible</strong></td>
+-                            <td><?php echo esc_html($rest_enabled); ?></td>
+-                        </tr>
+-                        <tr>
+-                            <td><strong>Object Cache disponible</strong></td>
+-                            <td><?php echo esc_html($cache_enabled); ?></td>
+-                        </tr>
+-                    </tbody>
+-                </table>
+-
+-                <hr style="margin:40px 0;">
+-
+-                <h2>Estado del sistema FS</h2>
+-
+-                <table class="widefat striped" style="margin-top:20px;">
+-                    <tbody>
+-                        <tr>
+-                            <td><strong>CPT fs_producto</strong></td>
+-                            <td><?php echo post_type_exists('fs_producto') ? 'Activo' : 'No detectado'; ?></td>
+-                        </tr>
+-                        <tr>
+-                            <td><strong>CPT fs_variante</strong></td>
+-                            <td><?php echo post_type_exists('fs_variante') ? 'Activo' : 'No detectado'; ?></td>
+-                        </tr>
+-                        <tr>
+-                            <td><strong>CPT fs_oferta</strong></td>
+-                            <td><?php echo post_type_exists('fs_oferta') ? 'Activo' : 'No detectado'; ?></td>
+-                        </tr>
+-                    </tbody>
+-                </table>
+-
+-                <div style="margin-top:40px;">
+-                    <button class="fs-btn-primary" id="fs-copy-system-info">
+-                        Copiar información
+-                    </button>
+-                </div>
++            <div class="fs-admin-shell">
++                <div class="fs-card">
++
++                    <div class="fs-card__header">
++                        <h2 class="fs-card__title">Entorno del servidor</h2>
++                        <p class="fs-card__subtitle">Versiones y capacidades detectadas.</p>
++                    </div>
++
++                    <table class="widefat striped fs-table">
++                        <tbody>
++                            <tr>
++                                <td><strong>Plugin Version</strong></td>
++                                <td><?php echo esc_html(FS_SC_SUITE_VERSION); ?></td>
++                            </tr>
++                            <tr>
++                                <td><strong>PHP Version</strong></td>
++                                <td><?php echo esc_html((string) $php_version); ?></td>
++                            </tr>
++                            <tr>
++                                <td><strong>WordPress Version</strong></td>
++                                <td><?php echo esc_html((string) $wp_version); ?></td>
++                            </tr>
++                            <tr>
++                                <td><strong>MySQL Version</strong></td>
++                                <td><?php echo esc_html((string) $mysql_version); ?></td>
++                            </tr>
++                            <tr>
++                                <td><strong>Memory Limit</strong></td>
++                                <td><?php echo esc_html((string) $memory_limit); ?></td>
++                            </tr>
++                            <tr>
++                                <td><strong>REST API disponible</strong></td>
++                                <td><?php echo esc_html($rest_enabled); ?></td>
++                            </tr>
++                            <tr>
++                                <td><strong>Object Cache disponible</strong></td>
++                                <td><?php echo esc_html($cache_enabled); ?></td>
++                            </tr>
++                        </tbody>
++                    </table>
++
++                    <hr class="fs-divider">
++
++                    <div class="fs-card__header">
++                        <h2 class="fs-card__title">Estado del sistema FS</h2>
++                        <p class="fs-card__subtitle">Detección de CPT principales.</p>
++                    </div>
++
++                    <table class="widefat striped fs-table">
++                        <tbody>
++                            <tr>
++                                <td><strong>CPT fs_producto</strong></td>
++                                <td><?php echo post_type_exists('fs_producto') ? 'Activo' : 'No detectado'; ?></td>
++                            </tr>
++                            <tr>
++                                <td><strong>CPT fs_variante</strong></td>
++                                <td><?php echo post_type_exists('fs_variante') ? 'Activo' : 'No detectado'; ?></td>
++                            </tr>
++                            <tr>
++                                <td><strong>CPT fs_oferta</strong></td>
++                                <td><?php echo post_type_exists('fs_oferta') ? 'Activo' : 'No detectado'; ?></td>
++                            </tr>
++                        </tbody>
++                    </table>
++
++                    <div class="fs-actions">
++                        <button
++                            class="button button-primary fs-btn-primary"
++                            id="fs-copy-system-info"
++                            type="button"
++                            data-fs-copy-system="1"
++                            data-fs-copy-label="Copiar información"
++                            data-fs-copy-done="Copiado ✔">
++                            Copiar información
++                        </button>
++                    </div>
+ 
++                </div>
+             </div>
+ 
+         </div>
+-
+-        <script>
+-        document.addEventListener('DOMContentLoaded', function () {
+-            const btn = document.getElementById('fs-copy-system-info');
+-            if (!btn) return;
+-
+-            btn.addEventListener('click', function () {
+-                const rows = document.querySelectorAll('.widefat tbody tr');
+-                let text = '';
+-
+-                rows.forEach(row => {
+-                    const cells = row.querySelectorAll('td');
+-                    if (cells.length === 2) {
+-                        text += cells[0].innerText + ': ' + cells[1].innerText + '\n';
+-                    }
+-                });
+-
+-                navigator.clipboard.writeText(text);
+-                btn.innerText = 'Copiado ✔';
+-            });
+-        });
+-        </script>
+-
+         <?php
+     }
+ }
+diff --git a/plugins/fs-shortcode-suite/includes/Core/Assets.php b/plugins/fs-shortcode-suite/includes/Core/Assets.php
+index ba5c77e..72eb838 100644
+--- a/plugins/fs-shortcode-suite/includes/Core/Assets.php
++++ b/plugins/fs-shortcode-suite/includes/Core/Assets.php
+@@ -3,15 +3,25 @@ declare(strict_types=1);
+ 
+ namespace FS\ShortcodeSuite\Core;
+ 
++defined('ABSPATH') || exit;
++
+ final class Assets {
+ 
+     public function init(): void {
+-
+-        add_action( 'wp_enqueue_scripts', [ $this, 'register' ] );
++        add_action('wp_enqueue_scripts', [$this, 'register']);
+     }
+ 
++    /**
++     * Registro global de assets
++     */
+     public function register(): void {
+ 
++        /*
++        |--------------------------------------------------------------------------
++        | GRID
++        |--------------------------------------------------------------------------
++        */
++
+         wp_register_style(
+             'fs-grid',
+             FS_SC_SUITE_URL . 'public/css/grid.css',
+@@ -26,11 +36,85 @@ final class Assets {
+             FS_SC_SUITE_VERSION,
+             true
+         );
++
++        /*
++        |--------------------------------------------------------------------------
++        | SEARCH
++        |--------------------------------------------------------------------------
++        */
++
++        wp_register_style(
++            'fs-search',
++            FS_SC_SUITE_URL . 'public/css/search.css',
++            [],
++            FS_SC_SUITE_VERSION
++        );
++
++        wp_register_script(
++            'fs-search',
++            FS_SC_SUITE_URL . 'public/js/search.js',
++            [],
++            FS_SC_SUITE_VERSION,
++            true
++        );
++
++        /*
++        |--------------------------------------------------------------------------
++        | SIZE GUIDE
++        |--------------------------------------------------------------------------
++        */
++
++        wp_register_style(
++            'fs-size-guide',
++            FS_SC_SUITE_URL . 'public/css/size-guide.css',
++            [],
++            FS_SC_SUITE_VERSION
++        );
++        
++        wp_register_script(
++            'fs-size-guide',
++            FS_SC_SUITE_URL . 'public/js/size-guide.js',
++            [],
++            FS_SC_SUITE_VERSION,
++            true
++        );
++
++        // No registramos JS porque es contenido informativo estático.
+     }
+ 
++    /*
++    |--------------------------------------------------------------------------
++    | Enqueue GRID
++    |--------------------------------------------------------------------------
++    */
++
+     public static function enqueue_grid(): void {
+ 
+-        wp_enqueue_style( 'fs-grid' );
+-        wp_enqueue_script( 'fs-grid' );
++        wp_enqueue_style('fs-grid');
++        wp_enqueue_script('fs-grid');
++    }
++
++    /*
++    |--------------------------------------------------------------------------
++    | Enqueue SEARCH
++    |--------------------------------------------------------------------------
++    */
++
++    public static function enqueue_search(): void {
++
++        wp_enqueue_style('fs-search');
++        wp_enqueue_script('fs-search');
++    }
++
++    /*
++    |--------------------------------------------------------------------------
++    | Enqueue SIZE GUIDE
++    |--------------------------------------------------------------------------
++    */
++
++    public static function enqueue_size_guide(): void {
++
++        wp_enqueue_style('fs-size-guide');
++        wp_enqueue_script('fs-size-guide');
+     }
+ }
+diff --git a/plugins/fs-shortcode-suite/includes/Core/Loader.php b/plugins/fs-shortcode-suite/includes/Core/Loader.php
+index fa6b12c..9111022 100644
+--- a/plugins/fs-shortcode-suite/includes/Core/Loader.php
++++ b/plugins/fs-shortcode-suite/includes/Core/Loader.php
+@@ -5,12 +5,17 @@ namespace FS\ShortcodeSuite\Core;
+ 
+ use FS\ShortcodeSuite\Data\Repository\Product_Repository;
+ use FS\ShortcodeSuite\Data\Builders\Grid_Dataset_Builder;
+-use FS\ShortcodeSuite\Data\Services\Grid_Service;
+ use FS\ShortcodeSuite\Core\Cache_Manager;
+-use FS\ShortcodeSuite\Shortcodes\Product_Grid;
+-use FS\ShortcodeSuite\REST\Grid_Controller;
+ use FS\ShortcodeSuite\Core\Assets;
+ use FS\ShortcodeSuite\Admin\Admin_Menu;
++use FS\ShortcodeSuite\Shortcodes\Product_Grid;
++use FS\ShortcodeSuite\Shortcodes\Product_Search;
++use FS\ShortcodeSuite\Shortcodes\Size_Guide;
++use FS\ShortcodeSuite\Data\Services\Search_Service;
++use FS\ShortcodeSuite\Data\Services\Grid_Service;
++use FS\ShortcodeSuite\REST\Search_Controller;
++use FS\ShortcodeSuite\REST\Grid_Controller;
++
+ 
+ defined('ABSPATH') || exit;
+ 
+@@ -19,6 +24,9 @@ final class Loader
+     public function init(): void
+     {
+         $this->boot_grid_system();
++        $this->boot_search_system();
++        $this->boot_misc_shortcodes();
++        $this->boot_shortcodes(); // 👈 AÑADE ESTO
+         $this->boot_admin();
+     }
+ 
+@@ -27,7 +35,16 @@ final class Loader
+     | Front / Grid System
+     |--------------------------------------------------------------------------
+     */
+-
++    private function boot_shortcodes(): void
++    {
++        new Product_Search();
++    }
++    
++    private function boot_misc_shortcodes(): void
++    {
++        new Size_Guide();
++    }
++    
+     private function boot_grid_system(): void
+     {
+         // Assets
+@@ -51,6 +68,19 @@ final class Loader
+         });
+     }
+ 
++    private function boot_search_system(): void
++    {
++        $service = new Search_Service();
++    
++        // Shortcode
++        new Product_Search($service);
++        
++        add_action('rest_api_init', function () use ($service) {
++            $controller = new Search_Controller($service);
++            $controller->register_routes();
++        });
++    }
++    
+     /*
+     |--------------------------------------------------------------------------
+     | Admin Area
+diff --git a/plugins/fs-shortcode-suite/includes/Core/Plugin.php b/plugins/fs-shortcode-suite/includes/Core/Plugin.php
+index f0b0708..0c9f3b4 100644
+--- a/plugins/fs-shortcode-suite/includes/Core/Plugin.php
++++ b/plugins/fs-shortcode-suite/includes/Core/Plugin.php
+@@ -5,6 +5,9 @@ namespace FS\ShortcodeSuite\Core;
+ 
+ use FS\ShortcodeSuite\Admin\Admin_Menu;
+ use FS\ShortcodeSuite\Shortcodes\Product_Grid;
++use FS\ShortcodeSuite\Shortcodes\Product_Search;
++use FS\ShortcodeSuite\Shortcodes\Size_Guide;
++
+ 
+ final class Plugin {
+ 
+@@ -18,5 +21,7 @@ final class Plugin {
+         ( new Assets() )->init();
+         ( new Admin_Menu() )->init();
+         ( new Product_Grid() )->register();
++        ( new Product_Search() )->register();
++        ( new Size_Guide() )->register();
+     }
+ }
+diff --git a/plugins/fs-shortcode-suite/includes/Data/Services/Search_Service.php b/plugins/fs-shortcode-suite/includes/Data/Services/Search_Service.php
+new file mode 100644
+index 0000000..8be5f8b
+--- /dev/null
++++ b/plugins/fs-shortcode-suite/includes/Data/Services/Search_Service.php
+@@ -0,0 +1,241 @@
++<?php
++declare(strict_types=1);
++
++namespace FS\ShortcodeSuite\Data\Services;
++
++use WP_Query;
++
++defined('ABSPATH') || exit;
++
++final class Search_Service
++{
++    private const LIMIT = 12;
++
++    public function search(string $query = '', array $filters = []): array
++    {
++        $query = trim($query);
++
++        $has_text    = $query !== '';
++        $has_filters = !empty($filters);
++
++        // 🔹 Productos limitados
++        $limited_args = $this->build_query_args($query, $filters);
++        $limited_args['posts_per_page'] = self::LIMIT;
++
++        $limited_query = new WP_Query($limited_args);
++        $product_ids   = $limited_query->posts ?: [];
++
++        // 🔹 Base completa para filtros
++        $facet_args = $this->build_query_args($query, $filters);
++        $facet_args['posts_per_page'] = -1;
++
++        $facet_query = new WP_Query($facet_args);
++        $facet_ids   = $facet_query->posts ?: [];
++
++        return [
++            'products' => ($has_text || $has_filters)
++                ? $this->build_products($product_ids)
++                : [],
++            'filters'  => $this->build_filters_dataset($facet_ids),
++        ];
++    }
++
++    private function build_query_args(string $query, array $filters): array
++    {
++        $meta_query = [
++            'relation' => 'AND',
++            [
++                'key'     => 'fs_has_stock',
++                'value'   => '1',
++                'compare' => '=',
++            ],
++        ];
++
++        if ($query !== '') {
++            $meta_query[] = [
++                'key'     => 'fs_model_signature',
++                'value'   => $query,
++                'compare' => 'LIKE',
++            ];
++        }
++
++        if (!empty($filters['superficie'])) {
++            $meta_query[] = [
++                'key'     => 'fs_superficie_available',
++                'value'   => (string) $filters['superficie'],
++                'compare' => 'LIKE',
++            ];
++        }
++
++        if (!empty($filters['talla'])) {
++            $meta_query[] = [
++                'key'     => 'fs_talla_available',
++                'value'   => (string) $filters['talla'],
++                'compare' => 'LIKE',
++            ];
++        }
++
++        if (!empty($filters['color'])) {
++            $meta_query[] = [
++                'key'     => 'fs_color_available',
++                'value'   => (string) $filters['color'],
++                'compare' => 'LIKE',
++            ];
++        }
++
++        $tax_query = ['relation' => 'AND'];
++
++        if (!empty($filters['marca'])) {
++            $tax_query[] = [
++                'taxonomy' => 'fs_marca',
++                'field'    => 'slug',
++                'terms'    => sanitize_title((string) $filters['marca']),
++            ];
++        }
++
++        if (!empty($filters['genero'])) {
++            $tax_query[] = [
++                'taxonomy' => 'fs_genero',
++                'field'    => 'slug',
++                'terms'    => sanitize_title((string) $filters['genero']),
++            ];
++        }
++
++        $args = [
++            'post_type'      => 'fs_producto',
++            'post_status'    => 'publish',
++            'fields'         => 'ids',
++            'meta_query'     => $meta_query,
++            'no_found_rows'  => true,
++        ];
++
++        if (count($tax_query) > 1) {
++            $args['tax_query'] = $tax_query;
++        }
++
++        return $args;
++    }
++
++    private function build_filters_dataset(array $product_ids): array
++    {
++        $sizes      = [];
++        $surfaces   = [];
++        $colors     = [];
++        $brands     = [];
++        $generos    = [];
++        $price_min  = null;
++        $price_max  = null;
++    
++        foreach ($product_ids as $product_id) {
++    
++            $product_id = (int) $product_id;
++    
++            // TALLAS
++            $rawSizes = get_post_meta($product_id, 'fs_talla_available', true);
++            foreach ($this->normalize_list_meta($rawSizes) as $size) {
++                $sizes[$size] = true;
++            }
++    
++            // SUPERFICIES
++            $rawSurfaces = get_post_meta($product_id, 'fs_superficie_available', true);
++            foreach ($this->normalize_list_meta($rawSurfaces) as $surface) {
++                $surfaces[$surface] = true;
++            }
++    
++            // 🔥 COLORES (NUEVO)
++            $rawColors = get_post_meta($product_id, 'fs_color_available', true);
++            foreach ($this->normalize_list_meta($rawColors) as $color) {
++                $colors[$color] = true;
++            }
++    
++            // PRECIO
++            $price = (float) get_post_meta($product_id, 'fs_price_min', true);
++            if ($price > 0) {
++                $price_min = $price_min === null ? $price : min($price_min, $price);
++                $price_max = $price_max === null ? $price : max($price_max, $price);
++            }
++    
++            // MARCA
++            $terms_brand = wp_get_post_terms($product_id, 'fs_marca');
++            if (!empty($terms_brand) && !is_wp_error($terms_brand)) {
++                foreach ($terms_brand as $term) {
++                    $brands[$term->slug] = $term->name;
++                }
++            }
++    
++            // GENERO
++            $terms_gen = wp_get_post_terms($product_id, 'fs_genero');
++            if (!empty($terms_gen) && !is_wp_error($terms_gen)) {
++                foreach ($terms_gen as $term) {
++                    $generos[$term->slug] = $term->name;
++                }
++            }
++        }
++    
++        ksort($brands);
++        ksort($generos);
++        ksort($surfaces);
++        ksort($colors);
++    
++        $sizes = array_keys($sizes);
++        sort($sizes, SORT_NATURAL);
++    
++        return [
++            'talla'      => $sizes,
++            'superficie' => array_keys($surfaces),
++            'color'      => array_keys($colors), // 🔥 MUY IMPORTANTE
++            'marca'      => $brands,
++            'genero'     => $generos,
++            'price_min'  => $price_min,
++            'price_max'  => $price_max,
++        ];
++    }
++
++
++    private function normalize_list_meta(mixed $raw): array
++    {
++        if (!$raw) return [];
++
++        $raw = maybe_unserialize($raw);
++
++        if (is_array($raw)) {
++            return array_values(array_unique(array_filter(array_map('trim', $raw))));
++        }
++
++        $parts = preg_split('~[\r\n,\|]+~', (string) $raw) ?: [];
++        return array_values(array_unique(array_filter(array_map('trim', $parts))));
++    }
++
++    private function build_products(array $ids): array
++    {
++        $out = [];
++    
++        foreach ($ids as $id) {
++    
++            $id = (int) $id;
++    
++            $rawColors = get_post_meta($id, 'fs_color_available', true);
++            $colors    = $this->normalize_list_meta($rawColors);
++            $colors_count = count($colors);
++    
++            $out[] = [
++                'id'           => $id,
++                'name'         => get_the_title($id),
++                'permalink'    => get_permalink($id),
++                'image'        => (string) get_post_meta($id, 'fs_image_main_url', true),
++                'price_from'   => (float) get_post_meta($id, 'fs_price_min', true),
++                'brand'        => $this->get_brand($id),
++                'colors_count' => $colors_count,
++            ];
++        }
++    
++        return $out;
++    }
++
++
++    private function get_brand(int $id): ?string
++    {
++        $terms = wp_get_post_terms($id, 'fs_marca');
++        return (!empty($terms) && !is_wp_error($terms)) ? $terms[0]->name : null;
++    }
++}
+diff --git a/plugins/fs-shortcode-suite/includes/REST/Search_Controller.php b/plugins/fs-shortcode-suite/includes/REST/Search_Controller.php
+new file mode 100644
+index 0000000..8ac87a3
+--- /dev/null
++++ b/plugins/fs-shortcode-suite/includes/REST/Search_Controller.php
+@@ -0,0 +1,89 @@
++<?php
++declare(strict_types=1);
++
++namespace FS\ShortcodeSuite\REST;
++
++use FS\ShortcodeSuite\Data\Services\Search_Service;
++use WP_REST_Request;
++use WP_REST_Response;
++
++defined('ABSPATH') || exit;
++
++final class Search_Controller
++{
++    private Search_Service $service;
++
++    public function __construct(Search_Service $service)
++    {
++        $this->service = $service;
++    }
++
++    public function register_routes(): void
++    {
++        register_rest_route(
++            'fs/v1',
++            '/search',
++            [
++                'methods'             => 'GET',
++                'callback'            => [$this, 'handle'],
++                'permission_callback' => '__return_true',
++                'args' => [
++                    'q' => [
++                        'required'          => false,
++                        'type'              => 'string',
++                        'sanitize_callback' => 'sanitize_text_field',
++                        'default'           => '',
++                    ],
++                    'marca' => [
++                        'type'              => 'string',
++                        'sanitize_callback' => 'sanitize_title',
++                    ],
++                    'superficie' => [
++                        'type'              => 'string',
++                        'sanitize_callback' => 'sanitize_title',
++                    ],
++                    'genero' => [
++                        'type'              => 'string',
++                        'sanitize_callback' => 'sanitize_title',
++                    ],
++                    'talla' => [
++                        'type'              => 'string',
++                        'sanitize_callback' => 'sanitize_title',
++                    ],
++                    'color' => [
++                        'type'              => 'string',
++                        'sanitize_callback' => 'sanitize_title',
++                    ],
++                    'orderby' => [
++                        'type'              => 'string',
++                        'sanitize_callback' => 'sanitize_key',
++                    ],
++                ],
++            ]
++        );
++    }
++
++
++    public function handle(WP_REST_Request $request): WP_REST_Response
++    {
++        $query = (string) $request->get_param('q');
++        $query = trim($query);
++    
++        $filters = [
++            'marca'      => $request->get_param('marca'),
++            'superficie' => $request->get_param('superficie'),
++            'genero'     => $request->get_param('genero'),
++            'talla'      => $request->get_param('talla'),
++            'color'      => $request->get_param('color'),
++            'orderby'    => $request->get_param('orderby'),
++        ];
++    
++        $filters = array_filter($filters);
++    
++        // 👇 Ahora permitimos query vacío
++        $results = $this->service->search($query ?? '', $filters);
++    
++        return new WP_REST_Response($results, 200);
++    }
++
++}
+diff --git a/plugins/fs-shortcode-suite/includes/Shortcodes/Product_Search.php b/plugins/fs-shortcode-suite/includes/Shortcodes/Product_Search.php
+new file mode 100644
+index 0000000..0844258
+--- /dev/null
++++ b/plugins/fs-shortcode-suite/includes/Shortcodes/Product_Search.php
+@@ -0,0 +1,148 @@
++<?php
++declare(strict_types=1);
++
++namespace FS\ShortcodeSuite\Shortcodes;
++
++use FS\ShortcodeSuite\Core\Assets;
++
++defined('ABSPATH') || exit;
++
++final class Product_Search
++{
++    public function __construct()
++    {
++        add_shortcode('fs_search', [$this, 'render']);
++    }
++
++    public function render(array $atts = []): string
++    {
++        Assets::enqueue_search();
++
++        wp_localize_script(
++            'fs-search',
++            'FSSearchConfig',
++            [
++                'restUrl' => esc_url_raw(rest_url('fs/v1/search')),
++            ]
++        );
++
++        ob_start();
++        ?>
++
++        <div class="fs-search" data-fs-search>
++            <button
++                class="fs-search-trigger"
++                type="button"
++                aria-haspopup="dialog"
++                aria-expanded="false">
++                <span class="fs-search-placeholder">
++                    <?php esc_html_e('Buscar', 'fs-shortcode-suite'); ?>
++                </span>
++            </button>
++        </div>
++
++        <div class="fs-search-overlay"
++             data-fs-search-overlay
++             aria-hidden="true"
++             role="dialog"
++             aria-modal="true">
++
++            <div class="fs-search-panel">
++
++                <!-- HEADER -->
++                <div class="fs-search-header">
++
++                    <div class="fs-search-logo">
++                        <?php echo wp_kses_post(wp_get_attachment_image(41, 'full')); ?>
++                    </div>
++
++                    <input
++                        type="search"
++                        class="fs-search-input"
++                        placeholder="<?php esc_attr_e('Buscar', 'fs-shortcode-suite'); ?>"
++                        aria-label="<?php esc_attr_e('Buscar productos', 'fs-shortcode-suite'); ?>"
++                        autocomplete="off"
++                        spellcheck="false"
++                    >
++
++                    <button class="fs-search-close" type="button">
++                        <?php esc_html_e('Cancelar', 'fs-shortcode-suite'); ?>
++                    </button>
++
++                </div>
++
++                <!-- BODY -->
++                <div class="fs-search-body fs-search-layout">
++
++                    <aside class="fs-search-sidebar">
++
++                        <?php
++                        $sections = [
++                            [
++                                'label'  => 'Ordenar',
++                                'type'   => 'orderby',
++                                'static' => true,
++                                'items'  => [
++                                    ['value' => 'price_asc',  'text' => 'Precio ↑'],
++                                    ['value' => 'price_desc', 'text' => 'Precio ↓'],
++                                    ['value' => 'newest',     'text' => 'Más nuevos'],
++                                ],
++                            ],
++                            ['label' => 'Marcas',      'type' => 'marca'],
++                            ['label' => 'Superficies', 'type' => 'superficie'],
++                            ['label' => 'Género',      'type' => 'genero'],
++                            ['label' => 'Tallas',      'type' => 'talla'],
++                            ['label' => 'Colores',     'type' => 'color'],
++                            ['label' => 'Precio',      'type' => 'price'],
++                        ];
++                        ?>
++
++                        <?php foreach ($sections as $section) : ?>
++
++                            <div class="fs-filter-section">
++
++                                <button type="button" class="fs-filter-header">
++                                    <?php echo esc_html($section['label']); ?>
++                                </button>
++
++                                <div class="fs-filter-options"
++
++                                    <?php if (empty($section['static'])) : ?>
++                                        data-dynamic-filter="<?php echo esc_attr($section['type']); ?>"
++                                    <?php endif; ?>
++                                >
++
++                                    <?php if (!empty($section['static'])) : ?>
++                                        <?php foreach ($section['items'] as $item) : ?>
++                                            <button type="button"
++                                                data-filter="orderby"
++                                                data-value="<?php echo esc_attr($item['value']); ?>">
++                                                <?php echo esc_html($item['text']); ?>
++                                            </button>
++                                        <?php endforeach; ?>
++                                    <?php endif; ?>
++
++                                </div>
++
++                            </div>
++
++                        <?php endforeach; ?>
++
++                        <!-- Pills activas -->
++                        <div class="fs-active-filters" data-fs-active-filters></div>
++
++                    </aside>
++
++                    <div class="fs-search-results-col">
++                        <div class="fs-search-results" data-fs-search-results></div>
++                    </div>
++
++                </div>
++
++            </div>
++        </div>
++
++        <?php
++        return (string) ob_get_clean();
++    }
++}
+diff --git a/plugins/fs-shortcode-suite/includes/Shortcodes/Size_Guide.php b/plugins/fs-shortcode-suite/includes/Shortcodes/Size_Guide.php
+new file mode 100644
+index 0000000..d882088
+--- /dev/null
++++ b/plugins/fs-shortcode-suite/includes/Shortcodes/Size_Guide.php
+@@ -0,0 +1,172 @@
++<?php
++declare(strict_types=1);
++
++namespace FS\ShortcodeSuite\Shortcodes;
++
++use FS\ShortcodeSuite\Core\Assets;
++
++defined('ABSPATH') || exit;
++
++final class Size_Guide {
++
++    public function __construct() {
++        error_log('Size Guide loaded');
++        add_shortcode('fs_size_guide', [$this, 'render']);
++        error_log('Size Guide loaded');
++    }
++
++    public function render(): string {
++
++        Assets::enqueue_size_guide();
++    
++        ob_start();
++        ?>
++    
++        <section class="fs-size-guide">
++    
++            <div class="fs-size-guide__inner">
++    
++                <header class="fs-size-guide__header">
++                    <h1>Guía Interactiva de Tallas Futsal</h1>
++                    <p>Selecciona tu perfil y consulta equivalencias internacionales.</p>
++                </header>
++    
++                <!-- Selector jugador -->
++                <div class="fs-size-section">
++                    <h2>Tipo de jugador</h2>
++    
++                    <div class="fs-player-selector">
++                        <button class="fs-player-btn" data-player="explosivo">Explosivo</button>
++                        <button class="fs-player-btn" data-player="tecnico">Técnico</button>
++                        <button class="fs-player-btn" data-player="defensivo">Defensivo</button>
++                    </div>
++    
++                    <div id="fs-player-recommendation" class="fs-player-recommendation">
++                        Selecciona un perfil para ver recomendación.
++                    </div>
++                </div>
++    
++                <!-- Tabla tallas -->
++                <div class="fs-size-section">
++                    <h2>Tabla EU ↔ US ↔ CM</h2>
++    
++                    <div class="fs-table-wrapper">
++                        <table class="fs-size-table">
++                            <thead>
++                                <tr>
++                                    <th>EU</th>
++                                    <th>US</th>
++                                    <th>CM</th>
++                                </tr>
++                            </thead>
++                            <tbody>
++                                <tr><td>39</td><td>6.5</td><td>24.5</td></tr>
++                                <tr><td>40</td><td>7</td><td>25</td></tr>
++                                <tr><td>41</td><td>8</td><td>26</td></tr>
++                                <tr><td>42</td><td>8.5</td><td>26.5</td></tr>
++                                <tr><td>43</td><td>9.5</td><td>27.5</td></tr>
++                                <tr><td>44</td><td>10</td><td>28</td></tr>
++                                <tr><td>45</td><td>11</td><td>29</td></tr>
++                            </tbody>
++                        </table>
++                    </div>
++                </div>
++                
++                <!-- RECOMENDACIONES POR MARCA -->
++                <div class="fs-size-section">
++                    <h2>Recomendaciones técnicas por marca</h2>
++                
++                    <div class="fs-size-grid">
++                
++                        <div class="fs-size-box">
++                            <h3>Nike</h3>
++                            <p>
++                                Horma generalmente estrecha.
++                                Ideal para jugadores técnicos o explosivos.
++                                Si tienes pie ancho, considera media talla más.
++                            </p>
++                        </div>
++                
++                        <div class="fs-size-box">
++                            <h3>Adidas</h3>
++                            <p>
++                                Ajuste fiel a talla.
++                                Sensación equilibrada entre comodidad y precisión.
++                                Buena opción para jugadores mixtos.
++                            </p>
++                        </div>
++                
++                        <div class="fs-size-box">
++                            <h3>Joma</h3>
++                            <p>
++                                Horma más amplia en antepié.
++                                Recomendada para pies anchos.
++                                Suele tallar ligeramente más cómoda.
++                            </p>
++                        </div>
++                
++                        <div class="fs-size-box">
++                            <h3>Mizuno</h3>
++                            <p>
++                                Ajuste técnico y preciso.
++                                Excelente para jugadores que buscan sensibilidad y control.
++                                Talla bastante fiel.
++                            </p>
++                        </div>
++                
++                        <div class="fs-size-box">
++                            <h3>Puma</h3>
++                            <p>
++                                Algunos modelos tallan ligeramente ajustados.
++                                Ideal para juego rápido y perfiles dinámicos.
++                            </p>
++                        </div>
++                
++                        <div class="fs-size-box">
++                            <h3>Kelme</h3>
++                            <p>
++                                Horma tradicional y cómoda.
++                                Buena estabilidad.
++                                Opción segura para jugadores defensivos.
++                            </p>
++                        </div>
++                
++                    </div>
++                </div>
++                
++                <!-- ENLACES OFICIALES -->
++                <div class="fs-size-section">
++                    <h2>Guías oficiales por marca</h2>
++    
++                    <div class="fs-size-guide__brands">
++    
++                        <a href="https://www.nike.com/es/size-fit/mens-footwear" target="_blank" rel="noopener" class="fs-size-card">
++                            <span class="fs-size-card__brand">Nike</span>
++                            <span class="fs-size-card__cta">Ver guía oficial →</span>
++                        </a>
++    
++                        <a href="https://www.adidas.es/guia-de-tallas" target="_blank" rel="noopener" class="fs-size-card">
++                            <span class="fs-size-card__brand">Adidas</span>
++                            <span class="fs-size-card__cta">Ver guía oficial →</span>
++                        </a>
++    
++                        <a href="https://www.mizuno.eu/es/size-guide" target="_blank" rel="noopener" class="fs-size-card">
++                            <span class="fs-size-card__brand">Mizuno</span>
++                            <span class="fs-size-card__cta">Ver guía oficial →</span>
++                        </a>
++    
++                        <a href="https://www.joma-sport.com/guia-de-tallas" target="_blank" rel="noopener" class="fs-size-card">
++                            <span class="fs-size-card__brand">Joma</span>
++                            <span class="fs-size-card__cta">Ver guía oficial →</span>
++                        </a>
++    
++                    </div>
++                </div>
++                
++            </div>
++        </section>
++    
++        <?php
++        return ob_get_clean();
++    }
++}
+diff --git a/plugins/fs-shortcode-suite/public/css/search.css b/plugins/fs-shortcode-suite/public/css/search.css
+new file mode 100644
+index 0000000..6e9a2be
+--- /dev/null
++++ b/plugins/fs-shortcode-suite/public/css/search.css
+@@ -0,0 +1,770 @@
++/* ==========================================================
++   FS SEARCH – TRIGGER (BOTÓN EN PÁGINA)
++   Scopeado para NO romper el theme
++========================================================== */
++
++.fs-search {
++    display: inline-block;
++}
++
++.fs-search .fs-search-trigger {
++    appearance: none;
++    border: 0;
++    cursor: pointer;
++
++    display: inline-flex;
++    align-items: center;
++    justify-content: center;
++
++    padding: 14px 22px;
++    border-radius: 0.5rem;
++
++    background: #66b60f;
++    color: #fff;
++
++    font-weight: 700;
++    font-size: 18px;
++    line-height: 1;
++}
++
++.fs-search .fs-search-trigger:focus {
++    outline: 2px solid rgba(102, 182, 15, 0.35);
++    outline-offset: 3px;
++}
++
++
++/* ==========================================================
++   FS SEARCH – OVERLAY
++========================================================== */
++
++.fs-search-overlay {
++    position: fixed;
++    inset: 0;
++    z-index: 9999;
++
++    display: flex;
++    align-items: center;
++    justify-content: center;
++
++    background: rgba(0, 0, 0, 0.45);
++    backdrop-filter: blur(4px);
++
++    opacity: 0;
++    pointer-events: none;
++    transition: opacity 0.2s ease;
++}
++
++.fs-search-overlay.is-active {
++    opacity: 1;
++    pointer-events: auto;
++}
++
++
++/* ==========================================================
++   PANEL
++========================================================== */
++
++.fs-search-panel {
++    width: min(1200px, 96vw);
++    height: min(85vh, 900px);
++
++    display: flex;
++    flex-direction: column;
++
++    background: #fff;
++    border-radius: 0.5rem;
++    overflow: hidden;
++
++    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.2);
++}
++
++
++/* ==========================================================
++   HEADER (CRÍTICO: LOGO + INPUT + CANCELAR)
++========================================================== */
++
++.fs-search-header {
++    display: flex;
++    align-items: center;
++    gap: 18px;
++
++    padding: 16px 18px;
++    border-bottom: 1px solid #eee;
++    background: #fff;
++}
++
++.fs-search-logo {
++    display: flex;
++    align-items: center;
++    flex: 0 0 auto;
++}
++
++.fs-search-logo img {
++    display: block;
++    max-height: 46px;
++    width: auto;
++    height: auto;
++}
++
++.fs-search-input {
++    flex: 1 1 auto;
++    min-width: 180px;
++
++    height: 44px;
++    padding: 0 14px;
++
++    border-radius: 0.5rem;
++    border: 1px solid #e5e5e5;
++
++    font-size: 16px;
++    outline: none;
++}
++
++.fs-search-input:focus {
++    border-color: rgba(102, 182, 15, 0.6);
++    box-shadow: 0 0 0 3px rgba(102, 182, 15, 0.12);
++}
++
++.fs-search-close {
++    flex: 0 0 auto;
++    height: 40px;
++    padding: 0 14px;
++
++    border-radius: 0.5rem;
++    border: 1px solid #e5e5e5;
++    background: #f5f5f5;
++
++    cursor: pointer;
++    font-weight: 600;
++}
++
++.fs-search-close:hover {
++    background: #eeeeee;
++}
++
++
++/* ==========================================================
++   BODY LAYOUT
++========================================================== */
++
++.fs-search-body {
++    flex: 1 1 auto;
++    min-height: 0; /* importante para scroll interno */
++}
++
++.fs-search-layout {
++    height: 100%;
++    display: grid;
++    grid-template-columns: 300px 1fr;
++}
++
++.fs-search-sidebar {
++    padding: 18px;
++    border-right: 1px solid #eee;
++    overflow: auto;
++    background: #fff;
++}
++
++.fs-search-results-col {
++    padding: 18px 22px;
++    overflow: auto;
++    background: #fff;
++}
++
++
++/* ==========================================================
++   FILTER SECTIONS (ACCORDION)
++========================================================== */
++
++.fs-filter-section {
++    border-bottom: 1px solid #f0f0f0;
++    padding: 6px 0;
++}
++
++.fs-filter-header {
++    width: 100%;
++    padding: 12px 0;
++
++    display: flex;
++    justify-content: space-between;
++    align-items: center;
++
++    background: transparent;
++    border: 0;
++
++    cursor: pointer;
++
++    font-size: 16px;
++    font-weight: 700;
++    text-align: left;
++}
++
++.fs-filter-header::after {
++    content: "+";
++    font-size: 18px;
++    line-height: 1;
++    transition: transform 0.2s ease;
++}
++
++.fs-filter-section.active .fs-filter-header::after {
++    content: "–";
++}
++
++
++/* ==========================================================
++   FILTER OPTIONS (MEJORADO)
++========================================================== */
++
++/* Estado cerrado */
++.fs-filter-options {
++    display: none;
++    flex-direction: column;
++    gap: 8px;
++    padding: 8px 0 12px 0;
++}
++
++/* Estado abierto */
++.fs-filter-section.active .fs-filter-options {
++    display: flex;
++    flex-direction: row;
++    flex-wrap: wrap;
++}
++
++/* Texto vacío */
++.fs-filter-empty {
++    display: block;
++    padding: 6px 0;
++    color: #999;
++}
++
++
++/* ==========================================================
++   FILTER BUTTONS
++========================================================== */
++
++.fs-filter-options button {
++    width: 45%;
++    text-align: center;
++
++    padding: 10px 12px;
++    border-radius: 0.5rem;
++    border: 1px solid #e5e5e5;
++
++    background: #f4f4f4;
++    cursor: pointer;
++
++    font-size: 15px;
++    font-weight: 600;
++
++    transition: background 0.2s ease, color 0.2s ease, border 0.2s ease;
++}
++
++.fs-filter-options button:hover {
++    background: #e9e9e9;
++}
++
++.fs-filter-options button.active {
++    background: #66b60f;
++    color: #fff;
++    border-color: #66b60f;
++}
++
++
++/* ==========================================================
++   RESULTS GRID
++========================================================== */
++
++.fs-search-results {
++    display: grid;
++    gap: 18px;
++    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
++}
++
++.fs-search-result-card {
++    display: block;
++    text-decoration: none;
++    color: inherit;
++
++    border-radius: 0.5rem;
++    overflow: hidden;
++
++    transition: transform 0.2s ease;
++}
++
++.fs-search-result-card:hover {
++    transform: translateY(-3px);
++}
++
++.fs-search-result-image {
++    background: #f8f8f8;
++    aspect-ratio: 1 / 1;
++}
++
++.fs-search-result-image img {
++    width: 100%;
++    height: 100%;
++    object-fit: cover;
++    display: block;
++}
++
++.fs-search-result-content {
++    padding: 12px;
++}
++
++.fs-search-loading,
++.fs-search-empty {
++    padding: 40px 0;
++    text-align: center;
++    font-weight: 600;
++    color: #777;
++}
++
++
++/* ==========================================================
++   RESPONSIVE
++========================================================== */
++
++@media (max-width: 992px) {
++    .fs-search-panel {
++        height: 92vh;
++        border-radius: 0.5rem;
++    }
++
++    .fs-search-layout {
++        grid-template-columns: 1fr;
++    }
++
++    .fs-search-sidebar {
++        border-right: none;
++        border-bottom: 1px solid #eee;
++    }
++
++    .fs-search-header {
++        gap: 12px;
++    }
++
++    .fs-search-logo img {
++        max-height: 40px;
++    }
++}
++.fs-search {
++    width: 15rem;
++    border-radius: 0.5rem;
++}
++
++.fs-search-trigger {
++    height: 2rem;
++    padding: 0 1rem;
++}
++
++.fs-search .fs-search-trigger {
++    width: 100%;
++    height: 52px;
++
++    display: flex;
++    align-items: center;
++    justify-content: flex-start;
++
++    padding: 0 18px;
++
++    background: #f5f5f5;
++    border-radius: 0.5rem;
++    border: 1px solid #e5e5e5;
++
++    font-size: 18px;
++    font-weight: 500;
++    color: #666;
++
++    cursor: text;
++}
++
++.fs-search .fs-search-trigger:hover {
++    border-color: #66b60f;
++}
++
++.fs-search-placeholder {
++    opacity: 0.7;
++}
++/* CONTENEDOR */
++.fs-color-filter {
++    display: flex;
++    flex-wrap: wrap;
++    flex-direction: row;
++    justify-content: flex-start;
++    gap: 10px;
++}
++
++/* DOT */
++.fs-color-dot {
++    width: 14%!important;
++    border-radius: 0.5rem;
++    cursor: pointer;
++    transition: all .2s ease;
++    padding: 0;
++}
++
++/* Hover */
++.fs-color-dot:hover {
++    transform: scale(1.1);
++    border-color: #999;
++}
++
++/* Activo */
++.fs-color-dot.active {
++    border: 2px solid #000;
++    box-shadow: 0 0 0 2px #fff inset;
++}
++
++/* CONTENEDOR */
++.fs-price-slider{
++    position:relative;
++    width:100%;
++    padding:25px 0 40px;
++}
++
++/* TRACK BASE */
++.fs-price-track{
++    position:absolute;
++    top:30px;
++    left:0;
++    right:0;
++    height:6px;
++    background:#ddd;
++    border-radius:4px;
++}
++
++/* RANGO ACTIVO */
++.fs-price-range{
++    position:absolute;
++    top:30px;
++    height:6px;
++    background:#69a800;
++    border-radius:4px;
++}
++
++/* RANGE INPUT BASE */
++.fs-price-slider input[type=range]{
++    position:absolute;
++    top:22px;
++    left:0;
++    width:100%;
++    pointer-events:none;
++    background:none;
++    -webkit-appearance:none;
++}
++
++/* OCULTAR TRACK NATIVO */
++.fs-price-slider input[type=range]::-webkit-slider-runnable-track{
++    background:transparent;
++}
++.fs-price-slider input[type=range]::-moz-range-track{
++    background:transparent;
++}
++
++/* THUMB */
++.fs-price-slider input[type=range]::-webkit-slider-thumb{
++    -webkit-appearance:none;
++    height:20px;
++    width:20px;
++    background:#69a800;
++    border-radius:50%;
++    cursor:pointer;
++    pointer-events:all;
++    position:relative;
++    z-index:2;
++}
++
++.fs-price-slider input[type=range]::-moz-range-thumb{
++    height:20px;
++    width:20px;
++    background:#69a800;
++    border:none;
++    border-radius:50%;
++    cursor:pointer;
++    pointer-events:all;
++    position:relative;
++    z-index:2;
++}
++
++/* VALORES */
++.fs-price-values{
++    position:absolute;
++    top:50px;
++    left:0;
++    width:100%;
++    text-align:center;
++    font-weight:600;
++}
++.fs-price-slider {
++    display: flex;
++    flex-direction: column;
++    gap: 12px;
++}
++
++.fs-price-values {
++    display: flex;
++    justify-content: center;
++    gap: 8px;
++    font-size: 14px;
++    font-weight: 600;
++}
++
++.fs-product-card {
++    display: block;
++    text-decoration: none;
++    color: inherit;
++    transition: transform .2s ease, box-shadow .2s ease;
++}
++
++.fs-product-card:hover {
++    transform: translateY(-4px);
++}
++
++.fs-product-card__image {
++    background: #f5f5f5;
++    aspect-ratio: 1 / 1;
++    display: flex;
++    align-items: center;
++    justify-content: center;
++    overflow: hidden;
++}
++
++.fs-product-card__image img {
++    width: 100%;
++    height: 100%;
++    object-fit: contain;
++}
++
++.fs-product-card__content {
++    padding: 12px 4px 24px;
++}
++
++.fs-product-card__brand {
++    font-size: 12px;
++    font-weight: 600;
++    letter-spacing: .05em;
++    text-transform: uppercase;
++    color: #767677;
++    margin-bottom: 4px;
++}
++
++.fs-product-card__title {
++    font-size: 14px;
++    font-weight: 500;
++    margin: 0 0 6px;
++}
++
++.fs-product-card__price {
++    font-size: 14px;
++    font-weight: 500;
++    margin-bottom: 4px;
++}
++
++.fs-product-card__colors {
++    font-size: 13px;
++    color: #767677;
++}
++/* GRID */
++[data-fs-search-results] {
++    display: grid;
++    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
++    gap: 40px 24px;
++}
++
++/* CARD */
++.fs-product-card {
++    display: flex;
++    flex-direction: column;
++    text-decoration: none;
++    color: #111;
++    transition: transform .2s ease;
++}
++
++.fs-product-card:hover {
++    transform: translateY(-4px);
++}
++
++/* IMAGE */
++.fs-product-card__image {
++    background: #f6f6f6;
++    aspect-ratio: 1 / 1;
++    display: flex;
++    align-items: center;
++    justify-content: center;
++    margin-bottom: 14px;
++}
++
++.fs-product-card__image img {
++    width: 100%;
++    height: auto;
++    object-fit: contain;
++}
++
++/* BRAND */
++.fs-product-card__brand {
++    font-size: 12px;
++    letter-spacing: .08em;
++    text-transform: uppercase;
++    color: #767677;
++    margin-bottom: 6px;
++}
++
++/* TITLE */
++.fs-product-card__title {
++    font-size: 15px;
++    font-weight: 500;
++    margin: 0 0 6px;
++    line-height: 1.3;
++}
++
++/* PRICE */
++.fs-product-card__price {
++    font-weight: 500;
++    margin-bottom: 4px;
++}
++
++/* COLORS */
++.fs-product-card__colors {
++    font-size: 13px;
++    color: #767677;
++}
++
++.fs-product-card__content {
++    display: block !important;
++    height: auto !important;
++}
++
++/* ==============================
++   RESULTS GRID
++============================== */
++
++[data-fs-search-results] {
++    display: grid;
++    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
++    gap: 48px 32px;
++    padding: 24px 32px;
++}
++
++
++/* ==============================
++   PRODUCT CARD
++============================== */
++
++.fs-product-card {
++    display: flex;
++    flex-direction: column;
++    text-decoration: none;
++    color: #111;
++    transition: transform .2s ease;
++}
++
++.fs-product-card:hover {
++    transform: translateY(-6px);
++}
++
++
++/* ==============================
++   IMAGE CONTAINER
++============================== */
++
++.fs-product-card__image {
++    background: #f6f6f6;
++    aspect-ratio: 4 / 3;
++    max-height: 260px;
++    display: flex;
++    align-items: center;
++    justify-content: center;
++    margin-bottom: 16px;
++    overflow: hidden;
++}
++
++.fs-product-card__image img {
++    width: 85%;
++    height: auto;
++    object-fit: contain;
++    transition: transform .3s ease;
++}
++
++.fs-product-card:hover .fs-product-card__image img {
++    transform: scale(1.05);
++}
++
++
++/* ==============================
++   CONTENT
++============================== */
++
++.fs-product-card__content {
++    display: flex;
++    flex-direction: column;
++    line-height: 1rem;
++}
++
++
++/* ==============================
++   BRAND
++============================== */
++
++.fs-product-card__brand {
++    font-size: 12px;
++    font-weight: 500;
++    letter-spacing: .08em;
++    text-transform: uppercase;
++    color: #767677;
++    margin-bottom: 6px;
++}
++
++
++/* ==============================
++   TITLE
++============================== */
++
++.fs-product-card__title {
++    font-size: 15px;
++    font-weight: 500;
++    line-height: 1.35;
++    margin: 0 0 8px;
++    color: #111;
++}
++
++
++/* ==============================
++   PRICE
++============================== */
++
++.fs-product-card__price {
++    font-size: 14px;
++    font-weight: 500;
++    margin-bottom: 6px;
++}
++
++
++/* ==============================
++   COLORS COUNT
++============================== */
++
++.fs-product-card__colors {
++    font-size: 13px;
++    color: #767677;
++}
++
++
++/* ==============================
++   EMPTY STATE
++============================== */
++
++.fs-search-empty {
++    font-size: 16px;
++    padding: 60px 0;
++    text-align: center;
++    color: #767677;
++}
++.fs-product-card {
++    gap: 8px;
++}
++
++[data-fs-search-results] .fs-product-card__title {
++    font-size: 1rem!important;
++    line-height: 1;
++    font-weight: 600;
++}
+\ No newline at end of file
+diff --git a/plugins/fs-shortcode-suite/public/css/size-guide.css b/plugins/fs-shortcode-suite/public/css/size-guide.css
+new file mode 100644
+index 0000000..254b736
+--- /dev/null
++++ b/plugins/fs-shortcode-suite/public/css/size-guide.css
+@@ -0,0 +1,180 @@
++.fs-size-guide {
++  padding: 40px 20px;
++  background: #ffffff;
++}
++
++.fs-size-guide__inner {
++  max-width: 900px;
++  margin: 0 auto;
++}
++
++.fs-size-guide__header {
++  margin-bottom: 40px;
++}
++
++.fs-size-guide__header h1 {
++  font-size: 32px;
++  margin: 0 0 12px;
++  color: #1F2A3F; /* azul oscuro brand */
++}
++
++.fs-size-guide__header p {
++  margin: 0;
++  color: #6B7A8F;
++}
++
++.fs-size-guide__brands {
++  display: flex;
++  flex-direction: column;
++  gap: 16px;
++}
++
++.fs-size-card {
++  display: flex;
++  justify-content: space-between;
++  align-items: center;
++  padding: 18px 20px;
++  border-radius: 14px;
++  text-decoration: none;
++  border: 1px solid #e6e8eb;
++  transition: all .2s ease;
++  background: #fff;
++}
++
++.fs-size-card:hover {
++  border-color: #7AC70C; /* verde lima */
++  transform: translateY(-2px);
++}
++
++.fs-size-card__brand {
++  font-size: 18px;
++  font-weight: 600;
++  color: #1F2A3F;
++}
++
++.fs-size-card__cta {
++  font-size: 14px;
++  color: #7AC70C;
++}
++
++.fs-size-guide__note {
++  margin-top: 40px;
++  font-size: 14px;
++  color: #6B7A8F;
++}
++
++/* Desktop */
++@media (min-width: 768px) {
++
++  .fs-size-guide__brands {
++    flex-direction: row;
++  }
++
++  .fs-size-card {
++    flex: 1;
++  }
++
++}
++.fs-size-section {
++  margin-top: 60px;
++}
++
++.fs-size-section h2 {
++  font-size: 22px;
++  margin-bottom: 16px;
++  color: #1F2A3F;
++}
++
++.fs-size-section p,
++.fs-size-section li {
++  color: #6B7A8F;
++  font-size: 15px;
++  line-height: 1.6;
++}
++
++.fs-size-grid {
++  display: grid;
++  grid-template-columns: 1fr;
++  gap: 16px;
++  margin-top: 20px;
++}
++
++@media (min-width: 768px) {
++  .fs-size-grid {
++    grid-template-columns: repeat(3, 1fr);
++  }
++}
++
++.fs-size-box {
++  padding: 20px;
++  border: 1px solid #e6e8eb;
++  border-radius: 14px;
++  background: #fff;
++  transition: all .2s ease;
++}
++
++.fs-size-box:hover {
++  border-color: #7AC70C;
++  transform: translateY(-3px);
++}
++
++.fs-size-box h3 {
++  margin: 0 0 10px;
++  font-size: 16px;
++  color: #1F2A3F;
++}
++.fs-player-selector {
++  display: flex;
++  gap: 10px;
++  flex-wrap: wrap;
++}
++
++.fs-player-btn {
++  padding: 10px 16px;
++  border: 1px solid #e6e8eb;
++  border-radius: 30px;
++  background: #fff;
++  cursor: pointer;
++  font-size: 14px;
++  transition: all .2s ease;
++}
++
++.fs-player-btn.active,
++.fs-player-btn:hover {
++  background: #7AC70C;
++  color: #fff;
++  border-color: #7AC70C;
++}
++
++.fs-player-recommendation {
++  margin-top: 16px;
++  padding: 16px;
++  border-radius: 12px;
++  background: #f9fafb;
++  font-size: 14px;
++  color: #1F2A3F;
++}
++
++.fs-table-wrapper {
++  overflow-x: auto;
++  margin-top: 20px;
++}
++
++.fs-size-table {
++  width: 100%;
++  border-collapse: collapse;
++  min-width: 400px;
++}
++
++.fs-size-table th,
++.fs-size-table td {
++  padding: 12px;
++  text-align: left;
++  border-bottom: 1px solid #e6e8eb;
++  font-size: 14px;
++}
++
++.fs-size-table th {
++  background: #f3f4f6;
++  font-weight: 600;
++}
+diff --git a/plugins/fs-shortcode-suite/public/js/grid.js b/plugins/fs-shortcode-suite/public/js/grid.js
+index 35f734f..c26ed6c 100644
+--- a/plugins/fs-shortcode-suite/public/js/grid.js
++++ b/plugins/fs-shortcode-suite/public/js/grid.js
+@@ -3,6 +3,11 @@
+ 
+     if (typeof FSGridConfig === 'undefined') return;
+ 
++    const gridWrapper = document.querySelector('.fs-grid-wrapper');
++    const loadMoreBtn = document.querySelector('.fs-grid-load-more');
++
++    if (!gridWrapper) return;
++
+     const state = {
+         page: FSGridConfig.page || 1,
+         perPage: FSGridConfig.perPage || 12,
+@@ -11,10 +16,13 @@
+         loading: false
+     };
+ 
+-    const gridWrapper = document.querySelector('.fs-grid-wrapper');
+-    const loadMoreBtn = document.querySelector('.fs-grid-load-more');
++    /* ==========================
++       SAFE CLOSEST
++    ========================== */
+ 
+-    if (!gridWrapper) return;
++    const safeClosest = (target, selector) => {
++        return target instanceof Element ? target.closest(selector) : null;
++    };
+ 
+     /* ==========================
+        COLOR MAP
+@@ -24,26 +32,10 @@
+         negro: '#000000',
+         blanco: '#ffffff',
+         azul: '#1976d2',
+-        'azul marino': '#0d47a1',
+-        'azul royal': '#1565c0',
+         rojo: '#d32f2f',
+-        naranja: '#f57c00',
+         amarillo: '#fbc02d',
+-        'amarillo fluor': '#ffeb3b',
+         verde: '#388e3c',
+-        'verde fluor': '#66bb6a',
+         gris: '#9e9e9e',
+-        marron: '#5d4037',
+-        beige: '#d7ccc8',
+-        rosa: '#ec407a',
+-        fucsia: '#c2185b',
+-        morado: '#7b1fa2',
+-        plata: '#cfd8dc',
+-        oro: '#f9a825',
+-        turquesa: '#0097a7',
+-        coral: '#ff7043',
+-        bordeaux: '#6a1b1a',
+-        cuero: '#8d6e63',
+         multicolor: 'linear-gradient(45deg, red, yellow, blue)'
+     };
+ 
+@@ -58,15 +50,13 @@
+             if (card.dataset.initialized) return;
+ 
+             try {
+-                card._data = JSON.parse(card.dataset.product);
++                card._data = JSON.parse(card.dataset.product || '{}');
+             } catch {
+                 return;
+             }
+ 
+             card._activeColor = null;
+-
+             renderColorDots(card);
+-
+             card.dataset.initialized = 'true';
+         });
+     };
+@@ -111,38 +101,32 @@
+ 
+         const colorData = card._data?.colors?.[color];
+         if (!colorData) return;
+-    
++
+         card._activeColor = color;
+-    
++
+         const images = colorData.images || [];
+         const sizes  = colorData.sizes || {};
+-    
++
+         const imageEl  = card.querySelector('.fs-card__image');
+         const priceEl  = card.querySelector('.fs-card__price');
+         const sizesEl  = card.querySelector('.fs-card__sizes-count');
+-    
+-        /* Update image (solo una imagen) */
+-    
++
+         if (imageEl && images[0]) {
+             imageEl.src = images[0];
+         }
+-    
+-        /* Precio mínimo */
+-    
++
+         const prices = Object.values(sizes)
+             .map(s => s.price)
+             .filter(p => typeof p === 'number' && p > 0);
+-    
++
+         const minPrice = prices.length ? Math.min(...prices) : 0;
+-    
++
+         if (priceEl) {
+             priceEl.textContent = minPrice
+                 ? minPrice.toFixed(2).replace('.', ',') + ' €'
+                 : '';
+         }
+-    
+-        /* Tallas */
+-    
++
+         if (sizesEl) {
+             const totalSizes = Object.keys(sizes).length;
+             sizesEl.textContent = totalSizes
+@@ -157,33 +141,28 @@
+ 
+     document.addEventListener('click', (e) => {
+ 
+-        /* COLOR DOT */
+-        const dot = e.target.closest('.fs-color-dot');
+-        if (dot) {
+-
+-            e.preventDefault();
+-            e.stopPropagation();
++        const dot = safeClosest(e.target, '.fs-color-dot');
++        if (!dot) return;
+ 
+-            const card = dot.closest('.fs-card');
+-            if (!card) return;
++        e.preventDefault();
++        e.stopPropagation();
+ 
+-            const color = dot.dataset.color;
+-            if (!color) return;
++        const card = dot.closest('.fs-card');
++        if (!card) return;
+ 
+-            card.querySelectorAll('.fs-color-dot')
+-                .forEach(d => d.classList.remove('is-active'));
++        const color = dot.dataset.color;
++        if (!color) return;
+ 
+-            dot.classList.add('is-active');
++        card.querySelectorAll('.fs-color-dot')
++            .forEach(d => d.classList.remove('is-active'));
+ 
+-            updateCard(card, color);
+-            return;
+-        }
++        dot.classList.add('is-active');
++        updateCard(card, color);
+     });
+ 
+-    /* Optional: hover preview like Nike */
+     document.addEventListener('mouseover', (e) => {
+ 
+-        const dot = e.target.closest('.fs-color-dot');
++        const dot = safeClosest(e.target, '.fs-color-dot');
+         if (!dot) return;
+ 
+         const card = dot.closest('.fs-card');
+@@ -195,43 +174,6 @@
+         updateCard(card, color);
+     });
+ 
+-    document.addEventListener('mouseenter', (e) => {
+-
+-        const card = e.target.closest('.fs-card');
+-        if (!card) return;
+-    
+-        const color = card._activeColor;
+-        if (!color) return;
+-    
+-        const images = card._data?.colors?.[color]?.images;
+-        if (!images || images.length < 2) return;
+-    
+-        const imageEl = card.querySelector('.fs-card__image');
+-        if (imageEl) {
+-            imageEl.src = images[1];
+-        }
+-    
+-    }, true);
+-    
+-    document.addEventListener('mouseleave', (e) => {
+-    
+-        const card = e.target.closest('.fs-card');
+-        if (!card) return;
+-    
+-        const color = card._activeColor;
+-        if (!color) return;
+-    
+-        const images = card._data?.colors?.[color]?.images;
+-        if (!images || !images.length) return;
+-    
+-        const imageEl = card.querySelector('.fs-card__image');
+-        if (imageEl) {
+-            imageEl.src = images[0];
+-        }
+-    
+-    }, true);
+-
+-
+     /* ==========================
+        LOAD MORE
+     ========================== */
+@@ -256,12 +198,20 @@
+                 `${FSGridConfig.restUrl}?${params.toString()}`
+             );
+ 
++            if (!response.ok) {
++                throw new Error(`HTTP ${response.status}`);
++            }
++
+             const data = await response.json();
+ 
++            if (!data || !Array.isArray(data.items)) {
++                throw new Error('Invalid JSON structure');
++            }
++
+             appendProducts(data.items);
+ 
+             state.page = nextPage;
+-            state.hasMore = data.has_more;
++            state.hasMore = Boolean(data.has_more);
+ 
+             if (!state.hasMore && loadMoreBtn) {
+                 loadMoreBtn.remove();
+@@ -289,6 +239,8 @@
+ 
+         products.forEach(product => {
+ 
++            if (!product?.permalink) return;
++
+             const card = document.createElement('a');
+             card.className = 'fs-card';
+             card.href = product.permalink;
+@@ -296,11 +248,10 @@
+ 
+             card.innerHTML = `
+                 <div class="fs-card__image-wrapper">
+-                    <img class="fs-card__image fs-card__image--primary" src="">
+-                    <img class="fs-card__image fs-card__image--secondary" src="">
++                    <img class="fs-card__image" src="" alt="">
+                 </div>
+                 <div class="fs-card__content">
+-                    <h3 class="fs-card__title">${product.name}</h3>
++                    <h3 class="fs-card__title">${product.name || ''}</h3>
+                     <div class="fs-card__sizes-count"></div>
+                     <div class="fs-card__price"></div>
+                     <div class="fs-card__colors"></div>
+diff --git a/plugins/fs-shortcode-suite/public/js/search.js b/plugins/fs-shortcode-suite/public/js/search.js
+new file mode 100644
+index 0000000..33763de
+--- /dev/null
++++ b/plugins/fs-shortcode-suite/public/js/search.js
+@@ -0,0 +1,465 @@
++(() => {
++'use strict';
++
++document.addEventListener('DOMContentLoaded', () => {
++
++    if (typeof FSSearchConfig === 'undefined') return;
++
++    const overlay  = document.querySelector('[data-fs-search-overlay]');
++    const input    = overlay?.querySelector('.fs-search-input');
++    const results  = overlay?.querySelector('[data-fs-search-results]');
++
++    if (!overlay) return;
++
++    const dynamicContainers = {
++        talla: overlay.querySelector('[data-dynamic-filter="talla"]'),
++        superficie: overlay.querySelector('[data-dynamic-filter="superficie"]'),
++        marca: overlay.querySelector('[data-dynamic-filter="marca"]'),
++        genero: overlay.querySelector('[data-dynamic-filter="genero"]'),
++        color: overlay.querySelector('[data-dynamic-filter="color"]'),
++        price: overlay.querySelector('[data-dynamic-filter="price"]'),
++    };
++
++    let controller = null;
++    let debounceTimer = null;
++    let lastQuery = '';
++    let activeFilters = {};
++
++    /* =============================
++       COLOR MAP
++    ============================= */
++
++    const COLOR_MAP = {
++        negro:'#000000',
++        blanco:'#FFFFFF',
++        blanco_coral:'#F2ECDF',
++        rojo:'#FF0000',
++        azul:'#0000FF',
++        azul_marino:'#000080',
++        azul_claro:'#90D5FF',
++        azul_fucsia:'#6A00FF',
++        azul_royal:'#4169E1',
++        verde:'#008000',
++        verde_fluor:'#39FF14',
++        amarillo:'#FFFF00',
++        amarillo_fluor:'#CCFF00',
++        naranja:'#FFA500',
++        gris:'#808080',
++        gris_claro:'#CDCDCD',
++        rosa:'#FFC0CB',
++        morado:'#800080',
++        turquesa:'#40E0D0',
++        oro:'#FFD700',
++        plata:'#C0C0C0',
++        beige:'#F5F5DC',
++        marron:'#8B4513',
++        marrón:'#8B4513',
++        cuero:'#AC7434',
++        lima:'#99FF33',
++        royal:'#4169E1',
++        marino:'#000080',
++        bordeaux:'#800000',
++        neon:'#39FF14',
++        fucsia:'#FF00FF',
++        multicolor:'#999999'
++    };
++
++    const normalize = (str) => str.trim().toLowerCase();
++    const resolveHex = (colorName) => {
++        const key = normalize(colorName);
++        return COLOR_MAP[key] || '#CCCCCC';
++    };
++
++    /* =============================
++       OPEN / CLOSE
++    ============================= */
++
++    const openOverlay = () => {
++        overlay.classList.add('is-active');
++        overlay.setAttribute('aria-hidden','false');
++        document.body.classList.add('fs-search-open');
++        loadFiltersOnly();
++    };
++
++    const closeOverlay = () => {
++        overlay.classList.remove('is-active');
++        overlay.setAttribute('aria-hidden','true');
++        document.body.classList.remove('fs-search-open');
++        resetAll();
++    };
++
++    const resetAll = () => {
++        input.value = '';
++        results.innerHTML = '';
++        lastQuery = '';
++        activeFilters = {};
++        loadFiltersOnly();
++    };
++
++    document.addEventListener('click',(e)=>{
++        if (e.target.closest('.fs-search-trigger')){
++            e.preventDefault();
++            openOverlay();
++        }
++        if (e.target.closest('.fs-search-close') || e.target === overlay){
++            closeOverlay();
++        }
++    });
++
++    /* =============================
++       ACCORDION
++    ============================= */
++
++    overlay.addEventListener('click',(e)=>{
++        const header = e.target.closest('.fs-filter-header');
++        if (!header) return;
++
++        const section = header.closest('.fs-filter-section');
++        if (!section) return;
++
++        const isActive = section.classList.contains('active');
++
++        overlay.querySelectorAll('.fs-filter-section')
++            .forEach(s=>s.classList.remove('active'));
++
++        if (!isActive) section.classList.add('active');
++    });
++
++    /* =============================
++       FILTER CLICK
++    ============================= */
++
++    overlay.addEventListener('click',(e)=>{
++        const button = e.target.closest('[data-filter]');
++        if (!button) return;
++
++        const key = button.dataset.filter;
++        const val = button.dataset.value;
++        if (!key || !val) return;
++
++        if (activeFilters[key] === val){
++            delete activeFilters[key];
++        } else {
++            activeFilters[key] = val;
++        }
++
++        performSearch(lastQuery);
++    });
++
++    /* =============================
++       SEARCH
++    ============================= */
++
++    const buildQueryString = (query)=>{
++        const params = new URLSearchParams();
++        if (query) params.append('q',query);
++
++        Object.entries(activeFilters).forEach(([k,v])=>{
++            params.append(k,v);
++        });
++
++        return params.toString();
++    };
++
++    const loadFiltersOnly = async ()=>{
++        try{
++            const response = await fetch(FSSearchConfig.restUrl);
++            const data = await response.json();
++            renderDynamicFilters(data.filters || {});
++        }catch(e){ console.error(e); }
++    };
++
++    const performSearch = async (query)=>{
++
++        lastQuery = query.trim();
++
++        if (!lastQuery && Object.keys(activeFilters).length === 0){
++            results.innerHTML = '';
++            return;
++        }
++
++        if (controller) controller.abort();
++        controller = new AbortController();
++
++        try{
++            const response = await fetch(
++                `${FSSearchConfig.restUrl}?${buildQueryString(lastQuery)}`,
++                { signal: controller.signal }
++            );
++            const data = await response.json();
++            renderResults(data.products || []);
++            renderDynamicFilters(data.filters || {});
++        }catch(e){
++            if (e.name !== 'AbortError') console.error(e);
++        }
++    };
++
++    input?.addEventListener('input',(e)=>{
++        clearTimeout(debounceTimer);
++        const value = e.target.value.trim();
++
++        debounceTimer = setTimeout(()=>{
++            if (!value){
++                resetAll();
++                return;
++            }
++            performSearch(value);
++        },300);
++    });
++
++    /* =============================
++       RENDER FILTERS
++    ============================= */
++
++    const renderDynamicFilters = (filters = {}) => {
++
++        Object.entries(dynamicContainers).forEach(([key, container]) => {
++
++            if (!container) return;
++
++            /* =============================
++               PRICE SLIDER PROFESIONAL
++            ============================= */
++            
++            /* =============================
++               PRICE SLIDER PROFESIONAL
++            ============================= */
++            
++            if (key === 'price') {
++            
++                const min = Number(filters.price_min ?? 0);
++                const max = Number(filters.price_max ?? 0);
++            
++                // Validación fuerte
++                if (!Number.isFinite(min) || !Number.isFinite(max) || min >= max) {
++                    container.innerHTML = '';
++                    return;
++                }
++            
++                const currentMin = Number(activeFilters.price_min ?? min);
++                const currentMax = Number(activeFilters.price_max ?? max);
++            
++                container.innerHTML = `
++                    <div class="fs-price-slider">
++                        <div class="fs-slider-track"></div>
++            
++                        <input type="range"
++                            class="fs-range fs-range-min"
++                            min="${min}"
++                            max="${max}"
++                            step="1"
++                            value="${currentMin}"
++                            data-price="min">
++            
++                        <input type="range"
++                            class="fs-range fs-range-max"
++                            min="${min}"
++                            max="${max}"
++                            step="1"
++                            value="${currentMax}"
++                            data-price="max">
++            
++                        <div class="fs-price-values">
++                            <span data-price-label="min">${currentMin}€</span>
++                            <span> - </span>
++                            <span data-price-label="max">${currentMax}€</span>
++                        </div>
++                    </div>
++                `;
++            
++                const minInput = container.querySelector('[data-price="min"]');
++                const maxInput = container.querySelector('[data-price="max"]');
++                const minLabel = container.querySelector('[data-price-label="min"]');
++                const maxLabel = container.querySelector('[data-price-label="max"]');
++            
++                const updateSlider = (e) => {
++            
++                    let minVal = Number(minInput.value);
++                    let maxVal = Number(maxInput.value);
++            
++                    // Evitar cruce
++                    if (minVal > maxVal) {
++                        if (e.target === minInput) {
++                            minVal = maxVal;
++                            minInput.value = minVal;
++                        } else {
++                            maxVal = minVal;
++                            maxInput.value = maxVal;
++                        }
++                    }
++            
++                    activeFilters.price_min = minVal;
++                    activeFilters.price_max = maxVal;
++            
++                    minLabel.textContent = `${minVal}€`;
++                    maxLabel.textContent = `${maxVal}€`;
++            
++                    clearTimeout(debounceTimer);
++                    debounceTimer = setTimeout(() => {
++                        performSearch(lastQuery);
++                    }, 200);
++                };
++            
++                minInput.addEventListener('input', updateSlider);
++                maxInput.addEventListener('input', updateSlider);
++            
++                return;
++            }
++
++
++            const values = filters[key];
++
++            if (!values || (Array.isArray(values) && !values.length)) {
++                container.innerHTML = '';
++                return;
++            }
++
++            /* =============================
++               COLORS
++            ============================= */
++
++            if (Array.isArray(values) && key === 'color') {
++
++                const unique = new Map();
++
++                values.forEach(slug => {
++
++                    const normalizedSlug = normalize(slug);
++                    const parts = normalizedSlug.split('-');
++                    const hexParts = parts.map(resolveHex);
++                    const hexKey = [...hexParts].sort().join('|');
++
++                    if (!unique.has(hexKey)) {
++                        unique.set(hexKey, {
++                            slug: normalizedSlug,
++                            hexParts
++                        });
++                    }
++                });
++
++                const sorted = [...unique.values()]
++                    .sort((a, b) => a.slug.localeCompare(b.slug));
++
++                container.innerHTML = sorted.map(entry => {
++
++                    let background;
++
++                    if (entry.slug === 'multicolor') {
++                        background = 'linear-gradient(45deg, red, orange, yellow, green, blue, purple)';
++                    } else {
++                        background = entry.hexParts.length === 1
++                            ? entry.hexParts[0]
++                            : `linear-gradient(45deg, ${entry.hexParts.join(',')})`;
++                    }
++
++                    return `
++                        <button type="button"
++                            data-filter="color"
++                            data-value="${entry.slug}"
++                            title="${entry.slug.replace(/[-_]/g,' ')}"
++                            class="fs-color-dot ${activeFilters[key] === entry.slug ? 'active' : ''}"
++                            style="background:${background}">
++                        </button>
++                    `;
++                }).join('');
++
++                return;
++            }
++
++            /* =============================
++               OTHER FILTERS
++            ============================= */
++
++            if (Array.isArray(values)) {
++
++                container.innerHTML = values.map(val => `
++                    <button type="button"
++                        data-filter="${key}"
++                        data-value="${val}"
++                        class="${activeFilters[key] === val ? 'active' : ''}">
++                        ${val}
++                    </button>
++                `).join('');
++
++            } else {
++
++                container.innerHTML = Object.entries(values).map(([slug, label]) => `
++                    <button type="button"
++                        data-filter="${key}"
++                        data-value="${slug}"
++                        class="${activeFilters[key] === slug ? 'active' : ''}">
++                        ${label}
++                    </button>
++                `).join('');
++            }
++
++        });
++    };
++
++    /* =============================
++       RESULTS - ADIDAS STYLE
++    ============================= */
++    
++    const renderResults = (items) => {
++    
++        if (!items.length) {
++            results.innerHTML = `
++                <div class="fs-search-empty">
++                    No hemos encontrado productos
++                </div>
++            `;
++            return;
++        }
++    
++        results.innerHTML = items.map(item => {
++    
++            const colorsCount = item.colors_count ?? 0;
++            const priceFrom = item.price_from ?? item.price ?? '';
++    
++            return `
++                <a href="${item.permalink}" class="fs-product-card">
++    
++                    <div class="fs-product-card__image">
++                        ${
++                            item.image
++                                ? `<img src="${item.image}" alt="${item.name}" loading="lazy">`
++                                : ''
++                        }
++                    </div>
++    
++                    <div class="fs-product-card__content">
++    
++                        ${item.brand 
++                            ? `<div class="fs-product-card__brand">${item.brand}</div>` 
++                            : ''
++                        }
++    
++                        <h3 class="fs-product-card__title">
++                            ${item.name}
++                        </h3>
++    
++                        ${
++                            priceFrom
++                                ? `<div class="fs-product-card__price">
++                                       Desde ${priceFrom} €
++                                   </div>`
++                                : ''
++                        }
++    
++                        ${
++                            colorsCount > 0
++                                ? `<div class="fs-product-card__colors">
++                                       ${colorsCount === 1 ? '1 color' : `${colorsCount} colores`}
++                                   </div>`
++                                : ''
++                        }
++    
++                    </div>
++                </a>
++            `;
++        }).join('');
++    };
++
++
++    });
++})();
+diff --git a/plugins/fs-shortcode-suite/public/js/size-guide.js b/plugins/fs-shortcode-suite/public/js/size-guide.js
+new file mode 100644
+index 0000000..af13d9d
+--- /dev/null
++++ b/plugins/fs-shortcode-suite/public/js/size-guide.js
+@@ -0,0 +1,37 @@
++(() => {
++
++    const buttons = document.querySelectorAll('.fs-player-btn');
++    const output = document.getElementById('fs-player-recommendation');
++
++    if (!buttons.length || !output) return;
++
++    const recommendations = {
++        explosivo: `
++            <strong>Jugador explosivo:</strong><br>
++            Recomendamos ajuste ceñido. Considera media talla menos
++            si prefieres mayor precisión en cambios rápidos.
++        `,
++        tecnico: `
++            <strong>Jugador técnico:</strong><br>
++            Ajuste preciso y horma estrecha.
++            Modelos tipo Nike o Mizuno suelen funcionar mejor.
++        `,
++        defensivo: `
++            <strong>Jugador defensivo:</strong><br>
++            Prioriza estabilidad y confort.
++            Ajuste estándar o ligeramente más amplio.
++        `
++    };
++
++    buttons.forEach(btn => {
++        btn.addEventListener('click', () => {
++
++            buttons.forEach(b => b.classList.remove('active'));
++            btn.classList.add('active');
++
++            const type = btn.dataset.player;
++            output.innerHTML = recommendations[type] || '';
++        });
++    });
++
++})();

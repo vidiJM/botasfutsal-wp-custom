@@ -209,20 +209,29 @@ final class Search_Service
     private function build_products(array $ids): array
     {
         $out = [];
-
+    
         foreach ($ids as $id) {
+    
+            $id = (int) $id;
+    
+            $rawColors = get_post_meta($id, 'fs_color_available', true);
+            $colors    = $this->normalize_list_meta($rawColors);
+            $colors_count = count($colors);
+    
             $out[] = [
-                'id'        => (int) $id,
-                'name'      => get_the_title($id),
-                'permalink' => get_permalink($id),
-                'image'     => (string) get_post_meta($id, 'fs_image_main_url', true),
-                'price'     => (float) get_post_meta($id, 'fs_price_min', true),
-                'brand'     => $this->get_brand($id),
+                'id'           => $id,
+                'name'         => get_the_title($id),
+                'permalink'    => get_permalink($id),
+                'image'        => (string) get_post_meta($id, 'fs_image_main_url', true),
+                'price_from'   => (float) get_post_meta($id, 'fs_price_min', true),
+                'brand'        => $this->get_brand($id),
+                'colors_count' => $colors_count,
             ];
         }
-
+    
         return $out;
     }
+
 
     private function get_brand(int $id): ?string
     {
