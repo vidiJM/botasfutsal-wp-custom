@@ -51,6 +51,8 @@ final class Importer
             unset($product, $productPostId);
         }
 
+        ProductAggregator::aggregateAll(100);
+        
         return [
             'imported' => $imported,
             'failed'   => $failed,

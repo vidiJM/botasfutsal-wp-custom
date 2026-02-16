@@ -4,7 +4,7 @@
  * Plugin URI: https://botasfutsal.com
  * Description: Motor profesional de shortcodes optimizados para BOTASFUTSAL.
  * Version: 1.0.0
- * Author: Vidal Joven Montull
+ * Author: Vidal Joven 
  * Author URI: https://botasfutsal.com
  * Text Domain: fs-shortcode-suite
  */

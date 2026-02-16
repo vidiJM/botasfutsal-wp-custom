@@ -88,24 +88,36 @@ final class VariantImporter
         // TALLAS (solo ofertas con stock)
         // =========================
         $sizes = [];
-
+        
         if (!empty($variant->offers)) {
             foreach ($variant->offers as $offer) {
+        
                 if ($offer->inStock === true && !empty($offer->size)) {
+        
                     $size = trim((string) $offer->size);
+        
                     if ($size !== '') {
-                        $sizes[] = $size;
+                        $sizes[$size] = true;
                     }
                 }
             }
         }
-
-        $sizes = array_values(array_unique($sizes));
-
+        
+        $sizes = array_keys($sizes);
+        
         if ($sizes) {
+        
+            // 1️⃣ Guardar taxonomía (para admin y filtros WP)
             TaxonomyAssigner::setMultiple(
                 $postId,
                 'fs_talla_eu',
+                $sizes
+            );
+        
+            // 2️⃣ Guardar meta agregado (para ProductAggregator)
+            update_post_meta(
+                $postId,
+                'fs_size_eu',
                 $sizes
             );
         }

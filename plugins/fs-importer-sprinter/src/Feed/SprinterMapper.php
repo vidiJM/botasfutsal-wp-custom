@@ -160,7 +160,7 @@ final class SprinterMapper
                 $offer->merchantName = $merchantName;
                 $offer->merchantId   = $merchantId;
                 $offer->price        = $price;
-                $offer->size         = $size;
+                $offer->size = (string) $size;
                 $offer->inStock      = true;
 
                 $variant->offers[] = $offer;

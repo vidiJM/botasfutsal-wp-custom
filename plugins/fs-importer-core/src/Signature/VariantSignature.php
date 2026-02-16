@@ -1,27 +1,23 @@
 <?php
+declare(strict_types=1);
+
 namespace FS\ImporterCore\Signature;
 
 use FS\ImporterCore\Normalizer\TextNormalizer;
 
-/**final class VariantSignature
-{
-    public static function make(
-        string $productId,
-        ?string $gtin,
-        string $colorBase
-    ): string {
-        if ($gtin) {
-            return sha1($gtin);
-        }
+defined('ABSPATH') || exit;
 
-        $color = TextNormalizer::normalize($colorBase);
-
-        return sha1($productId . '|' . $color);
-    }
-}
-
-**/
-
+/**
+ * VariantSignature
+ *
+ * Arquitectura:
+ * - Variante = Color (no talla)
+ * - Oferta   = Talla + Merchant + Precio
+ *
+ * Nota:
+ * - GTIN suele identificar SKU (a menudo talla específica). Si lo usas aquí,
+ *   fragmentas variantes y rompes el modelo (variante por talla).
+ */
 final class VariantSignature
 {
     public static function make(
@@ -29,16 +25,10 @@ final class VariantSignature
         ?string $gtin,
         string $colorBase
     ): string {
+        $pid   = strtolower(trim($productId));
+        $color = strtolower(trim(TextNormalizer::normalize($colorBase)));
 
-        // SI HAY GTIN, usarlo SIEMPRE (Sprinter lo usa como identificador único)
-        if (!empty($gtin)) {
-            return sha1(strtolower(trim($gtin)));
-        }
-
-        // Si no hay GTIN, construir firma alternativa estable
-        return sha1(
-            strtolower(trim($productId)) . '|' . 
-            strtolower(trim(TextNormalizer::normalize($colorBase)))
-        );
+        // Firma estable solo por producto + color (modelo correcto)
+        return sha1($pid . '|' . $color);
     }
 }

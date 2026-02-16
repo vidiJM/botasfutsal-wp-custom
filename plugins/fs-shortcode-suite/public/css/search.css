@@ -1,187 +1,385 @@
-/* ================================
-   TRIGGER BAR (Header style)
-================================ */
+/* ==========================================================
+   FS SEARCH – TRIGGER (BOTÓN EN PÁGINA)
+   Scopeado para NO romper el theme
+========================================================== */
 
-.fs-search-trigger {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background: #f2f2f2;
-    border-radius: 5px;
-    padding: 10px 20px;
-    min-width: 220px;
+.fs-search {
+    display: inline-block;
+}
+
+.fs-search .fs-search-trigger {
+    appearance: none;
+    border: 0;
     cursor: pointer;
-    transition: background .2s ease;
-    border: solid;
-    border-color: #84cc16;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 14px 22px;
+    border-radius: 0.5rem;
+
+    background: #66b60f;
+    color: #fff;
+
+    font-weight: 700;
+    font-size: 18px;
+    line-height: 1;
+}
+
+.fs-search .fs-search-trigger:focus {
+    outline: 2px solid rgba(102, 182, 15, 0.35);
+    outline-offset: 3px;
 }
 
 
-.fs-search-trigger:hover {
-    background: #e8e8e8;
-    border-radius: 5px;
-    border-color: #84cc16;
-    border: solid;
-}
-
-.fs-search-placeholder {
-    font-size: 14px;
-    color: #777;
-}
-.fs-search-trigger:focus {
-    outline: none;
-}
-
-.fs-search-trigger:active {
-    transform: scale(0.98);
-}
-
-/* ================================
-   OVERLAY BASE
-================================ */
+/* ==========================================================
+   FS SEARCH – OVERLAY
+========================================================== */
 
 .fs-search-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.15);
-    backdrop-filter: blur(4px);
-    z-index: 99999;
+    z-index: 9999;
+
     display: flex;
+    align-items: center;
     justify-content: center;
-    align-items: flex-start;
-    padding-top: 80px;
+
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(4px);
 
     opacity: 0;
-    visibility: hidden;
-    transition: opacity .25s ease;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
 }
 
 .fs-search-overlay.is-active {
     opacity: 1;
-    visibility: visible;
-}
-
-body.fs-search-open {
-    overflow: hidden;
+    pointer-events: auto;
 }
 
 
-/* ================================
-   PANEL (Nike style)
-================================ */
+/* ==========================================================
+   PANEL
+========================================================== */
 
 .fs-search-panel {
-    width: 90%;
-    max-width: 1200px;
-    height: 40vh; /* 👈 2/5 aprox */
+    width: min(1200px, 96vw);
+    height: min(85vh, 900px);
+
+    display: flex;
+    flex-direction: column;
+
     background: #fff;
-    border-radius: 20px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    border-radius: 0.5rem;
     overflow: hidden;
 
-    transform: translateY(-20px);
-    transition: transform .25s ease;
-}
-
-.fs-search-overlay.is-active .fs-search-panel {
-    transform: translateY(0);
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.2);
 }
 
 
-/* ================================
-   HEADER
-================================ */
+/* ==========================================================
+   HEADER (CRÍTICO: LOGO + INPUT + CANCELAR)
+========================================================== */
 
 .fs-search-header {
     display: flex;
     align-items: center;
-    gap: 30px;
-    padding: 30px 40px;
+    gap: 18px;
+
+    padding: 16px 18px;
     border-bottom: 1px solid #eee;
+    background: #fff;
+}
+
+.fs-search-logo {
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
 }
 
 .fs-search-logo img {
-    height: 5rem !important;
-    width: 10rem!important;
+    display: block;
+    max-height: 46px;
+    width: auto;
+    height: auto;
 }
 
 .fs-search-input {
-    flex: 1;
-    border: none;
-    border-bottom: 2px solid #111;
-    font-size: 22px;
-    font-weight: 500;
+    flex: 1 1 auto;
+    min-width: 180px;
+
+    height: 44px;
+    padding: 0 14px;
+
+    border-radius: 0.5rem;
+    border: 1px solid #e5e5e5;
+
+    font-size: 16px;
     outline: none;
-    padding: 6px 0;
+}
+
+.fs-search-input:focus {
+    border-color: rgba(102, 182, 15, 0.6);
+    box-shadow: 0 0 0 3px rgba(102, 182, 15, 0.12);
 }
 
 .fs-search-close {
-    background: none;
-    border: none;
-    font-size: 14px;
+    flex: 0 0 auto;
+    height: 40px;
+    padding: 0 14px;
+
+    border-radius: 0.5rem;
+    border: 1px solid #e5e5e5;
+    background: #f5f5f5;
+
     cursor: pointer;
+    font-weight: 600;
+}
+
+.fs-search-close:hover {
+    background: #eeeeee;
 }
 
 
-/* ================================
-   BODY
-================================ */
+/* ==========================================================
+   BODY LAYOUT
+========================================================== */
 
 .fs-search-body {
-    padding: 30px 40px;
-    overflow-y: auto;
-    height: calc(100% - 90px);
+    flex: 1 1 auto;
+    min-height: 0; /* importante para scroll interno */
 }
 
-.fs-search-result-item {
+.fs-search-layout {
+    height: 100%;
+    display: grid;
+    grid-template-columns: 300px 1fr;
+}
+
+.fs-search-sidebar {
+    padding: 18px;
+    border-right: 1px solid #eee;
+    overflow: auto;
+    background: #fff;
+}
+
+.fs-search-results-col {
+    padding: 18px 22px;
+    overflow: auto;
+    background: #fff;
+}
+
+
+/* ==========================================================
+   FILTER SECTIONS (ACCORDION)
+========================================================== */
+
+.fs-filter-section {
+    border-bottom: 1px solid #f0f0f0;
+    padding: 6px 0;
+}
+
+.fs-filter-header {
+    width: 100%;
+    padding: 12px 0;
+
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: 20px;
-    padding: 16px 0;
-    border-bottom: 1px solid #f1f1f1;
+
+    background: transparent;
+    border: 0;
+
+    cursor: pointer;
+
+    font-size: 16px;
+    font-weight: 700;
+    text-align: left;
+}
+
+.fs-filter-header::after {
+    content: "+";
+    font-size: 18px;
+    line-height: 1;
+    transition: transform 0.2s ease;
+}
+
+.fs-filter-section.active .fs-filter-header::after {
+    content: "–";
+}
+
+
+/* ==========================================================
+   FILTER OPTIONS (MEJORADO)
+========================================================== */
+
+/* Estado cerrado */
+.fs-filter-options {
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px 0 12px 0;
+}
+
+/* Estado abierto */
+.fs-filter-section.active .fs-filter-options {
+    display: flex;
+}
+
+/* Texto vacío */
+.fs-filter-empty {
+    display: block;
+    padding: 6px 0;
+    color: #999;
+}
+
+
+/* ==========================================================
+   FILTER BUTTONS
+========================================================== */
+
+.fs-filter-options button {
+    width: 100%;
+    text-align: center;
+
+    padding: 10px 12px;
+    border-radius: 0.5rem;
+    border: 1px solid #e5e5e5;
+
+    background: #f4f4f4;
+    cursor: pointer;
+
+    font-size: 15px;
+    font-weight: 600;
+
+    transition: background 0.2s ease, color 0.2s ease, border 0.2s ease;
+}
+
+.fs-filter-options button:hover {
+    background: #e9e9e9;
+}
+
+.fs-filter-options button.active {
+    background: #66b60f;
+    color: #fff;
+    border-color: #66b60f;
+}
+
+
+/* ==========================================================
+   RESULTS GRID
+========================================================== */
+
+.fs-search-results {
+    display: grid;
+    gap: 18px;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.fs-search-result-card {
+    display: block;
     text-decoration: none;
     color: inherit;
-    transition: background .2s ease;
+
+    border-radius: 0.5rem;
+    overflow: hidden;
+
+    transition: transform 0.2s ease;
 }
 
-.fs-search-result-item:hover {
-    background: #fafafa;
+.fs-search-result-card:hover {
+    transform: translateY(-3px);
 }
 
-.fs-search-result-item img {
-    width: 60px;
-    height: 60px;
-    object-fit: contain;
+.fs-search-result-image {
+    background: #f8f8f8;
+    aspect-ratio: 1 / 1;
 }
 
-.fs-search-result-title {
-    font-size: 15px;
-    font-weight: 500;
+.fs-search-result-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
 }
 
-.fs-search-result-price {
-    font-size: 14px;
-    color: #666;
+.fs-search-result-content {
+    padding: 12px;
+}
+
+.fs-search-loading,
+.fs-search-empty {
+    padding: 40px 0;
+    text-align: center;
+    font-weight: 600;
+    color: #777;
 }
 
 
-/* ================================
-   MOBILE
-================================ */
+/* ==========================================================
+   RESPONSIVE
+========================================================== */
 
-@media (max-width: 768px) {
-
+@media (max-width: 992px) {
     .fs-search-panel {
-        width: 95%;
-        height: 60vh;
-        border-radius: 15px;
+        height: 92vh;
+        border-radius: 0.5rem;
+    }
+
+    .fs-search-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .fs-search-sidebar {
+        border-right: none;
+        border-bottom: 1px solid #eee;
     }
 
     .fs-search-header {
-        padding: 20px;
+        gap: 12px;
     }
 
-    .fs-search-body {
-        padding: 20px;
+    .fs-search-logo img {
+        max-height: 40px;
     }
+}
+.fs-search {
+    width: 15rem;
+    border-radius: 0.5rem;
+}
+
+.fs-search-trigger {
+    height: 2rem;
+    padding: 0 1rem;
+}
+
+.fs-search .fs-search-trigger {
+    width: 100%;
+    height: 52px;
+
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+
+    padding: 0 18px;
+
+    background: #f5f5f5;
+    border-radius: 0.5rem;
+    border: 1px solid #e5e5e5;
+
+    font-size: 18px;
+    font-weight: 500;
+    color: #666;
+
+    cursor: text;
+}
+
+.fs-search .fs-search-trigger:hover {
+    border-color: #66b60f;
+}
+
+.fs-search-placeholder {
+    opacity: 0.7;
 }
