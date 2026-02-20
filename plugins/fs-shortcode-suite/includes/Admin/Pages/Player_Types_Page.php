@@ -5,18 +5,16 @@ namespace FS\ShortcodeSuite\Admin\Pages;
 
 defined('ABSPATH') || exit;
 
-final class Size_Guide_Page {
+final class Player_Types_Page {
 
     public function render(): void {
         ?>
-        <div class="wrap fs-admin-wrap">
-
-            <div class="fs-admin-header fs-admin-header--brand">
+        <div class="fs-admin-header fs-admin-header--brand">
                 <div class="fs-admin-header__title">
-                    <h1>Size Guide</h1>
-                    <span class="fs-pill">[fs_size_guide]</span>
+                    <h1>Player Types</h1>
+                    <span class="fs-pill">[fs_player_types]</span>
                 </div>
-                <p>Shortcode informativo para mostrar enlaces oficiales a guías de tallas.</p>
+                <p>Shortcode sección en la Home para mostrar tipos de jugadores.</p>
             </div>
 
             <div class="fs-card">
@@ -24,16 +22,17 @@ final class Size_Guide_Page {
                 <div class="fs-card__header">
                     <h2 class="fs-card__title">Uso</h2>
                 </div>
-                <pre class="fs-code-box" id="fs-search-output">[fs_size_guide]</pre>
+
+                <pre class="fs-code-box" id="fs-search-output">[fs_player_types]</pre>
                 
                 <button
                             class="button fs-copy-btn"
                             type="button"
-                            data-fs-copy="#fs-size-guide"
+                            data-fs-copy="#fs-player-types"
                             data-fs-copy-label="Copiar"
                             data-fs-copy-done="Copiado ✓"
                         >Copiar</button>
-                
+
                 <p>Pega este shortcode en una página informativa.</p>
 
                 <div class="fs-callout">
@@ -41,8 +40,6 @@ final class Size_Guide_Page {
                 </div>
 
             </div>
-
-        </div>
         <?php
     }
 }

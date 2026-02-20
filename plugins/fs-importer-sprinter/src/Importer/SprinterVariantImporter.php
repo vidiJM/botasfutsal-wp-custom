@@ -44,7 +44,7 @@ final class SprinterVariantImporter
 
         self::updateAcf($postId, $data, $variantId);
         self::updateTaxonomies($postId, $data);
-
+        
         return $postId;
     }
 
@@ -140,30 +140,171 @@ final class SprinterVariantImporter
 
     private static function updateTaxonomies(int $postId, array $data): void
     {
+        /*
+        |--------------------------------------------------------------------------
+        | COLOR
+        |--------------------------------------------------------------------------
+        */
         if (!empty($data['color'])) {
-            wp_set_object_terms($postId, sanitize_text_field((string) $data['color']), 'fs_color', false);
+            wp_set_object_terms(
+                $postId,
+                sanitize_text_field((string) $data['color']),
+                'fs_color',
+                false
+            );
         }
-
+    
+        /*
+        |--------------------------------------------------------------------------
+        | AGE GROUP
+        |--------------------------------------------------------------------------
+        */
         if (!empty($data['age_group'])) {
-            wp_set_object_terms($postId, sanitize_text_field((string) $data['age_group']), 'fs_age_group', false);
+            wp_set_object_terms(
+                $postId,
+                sanitize_text_field((string) $data['age_group']),
+                'fs_age_group',
+                false
+            );
         }
-
-        if (!empty($data['surface'])) {
-            wp_set_object_terms($postId, sanitize_text_field((string) $data['surface']), 'fs_superficie', false);
+    
+        /*
+        |--------------------------------------------------------------------------
+        | SUPERFICIE NORMALIZADA
+        |--------------------------------------------------------------------------
+        */
+        $normalizedSurface = self::normalizeSurface(
+            (string) ($data['surface'] ?? ''),
+            (string) ($data['title'] ?? '')
+        );
+    
+        if ($normalizedSurface) {
+            wp_set_object_terms($postId, $normalizedSurface, 'fs_superficie', false);
         }
-
+    
+        // --- CIERRE ---
+        $title = $data['title'] ?? '';
+        $closures = self::normalizeClosure($title);
+        
+        if (!empty($closures)) {
+            wp_set_object_terms(
+                $postId,
+                $closures,
+                'fs_cierre',
+                false
+            );
+        }
+    
+        /*
+        |--------------------------------------------------------------------------
+        | GÉNERO
+        |--------------------------------------------------------------------------
+        */
         if (!empty($data['gender']) && is_array($data['gender'])) {
-            wp_set_object_terms($postId, array_map('sanitize_text_field', array_map('strval', $data['gender'])), 'fs_genero', false);
+            wp_set_object_terms(
+                $postId,
+                array_map('sanitize_text_field', array_map('strval', $data['gender'])),
+                'fs_genero',
+                false
+            );
         } elseif (!empty($data['gender'])) {
-            wp_set_object_terms($postId, sanitize_text_field((string) $data['gender']), 'fs_genero', false);
+            wp_set_object_terms(
+                $postId,
+                sanitize_text_field((string) $data['gender']),
+                'fs_genero',
+                false
+            );
         }
-
+    
+        /*
+        |--------------------------------------------------------------------------
+        | TIENDA
+        |--------------------------------------------------------------------------
+        */
         if (!empty($data['merchant_name'])) {
-            wp_set_object_terms($postId, sanitize_text_field((string) $data['merchant_name']), 'fs_tienda', false);
+            wp_set_object_terms(
+                $postId,
+                sanitize_text_field((string) $data['merchant_name']),
+                'fs_tienda',
+                false
+            );
         }
-
+    
+        /*
+        |--------------------------------------------------------------------------
+        | TALLA
+        |--------------------------------------------------------------------------
+        */
         if (!empty($data['size'])) {
-            wp_set_object_terms($postId, sanitize_text_field((string) $data['size']), 'fs_talla_eu', false);
+            wp_set_object_terms(
+                $postId,
+                sanitize_text_field((string) $data['size']),
+                'fs_talla_eu',
+                false
+            );
         }
+        error_log(print_r(wp_get_object_terms($postId, 'fs_cierre'), true));
+
     }
+    
+    private static function normalizeSurface(string $rawSurface, string $title): ?string
+    {
+        $raw = strtoupper($rawSurface);
+        $t   = strtoupper($title);
+    
+        $hayIN  = str_contains($t, 'IN')  || str_contains($raw, 'IN');
+        $hayOUT = str_contains($t, 'OUT') || str_contains($raw, 'OUT');
+        $hayIC  = str_contains($t, 'IC')  || str_contains($raw, 'IC');
+        $hayFG  = str_contains($raw, 'FG');
+        $hayTurf = str_contains($t, 'TURF') || str_contains($raw, 'TURF');
+    
+        // TURF prioritario
+        if ($hayTurf) {
+            return 'turf';
+        }
+    
+        // IN/OUT o ambos presentes
+        if (($hayIN && $hayOUT) || str_contains($t, 'IN/OUT')) {
+            return 'mixed';
+        }
+    
+        // OUTDOOR
+        if ($hayOUT || $hayFG) {
+            return 'outdoor';
+        }
+    
+        // INDOOR
+        if ($hayIN || $hayIC) {
+            return 'indoor';
+        }
+    
+        return null;
+    }
+
+    private static function normalizeClosure(string $title): array
+    {
+        $title = strtoupper($title);
+    
+        $closures = [];
+    
+        // VCO → Velcro
+        if (str_contains($title, 'VCO') || str_contains($title, 'VELCRO')) {
+            $closures[] = 'velcro';
+        }
+    
+        // LACE → Cordones
+        if (str_contains($title, 'LACE')) {
+            $closures[] = 'cordones';
+        }
+    
+        // Elastic
+        if (str_contains($title, 'ELASTIC')) {
+            $closures[] = 'elastic';
+        }
+    
+        return array_unique($closures);
+    }
+
+
 }
+

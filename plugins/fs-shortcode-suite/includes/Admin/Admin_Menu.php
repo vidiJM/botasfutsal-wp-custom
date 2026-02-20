@@ -8,6 +8,9 @@ use FS\ShortcodeSuite\Admin\Pages\Grid_Page;
 use FS\ShortcodeSuite\Admin\Pages\Search_Page;
 use FS\ShortcodeSuite\Admin\Pages\Settings_Page;
 use FS\ShortcodeSuite\Admin\Pages\System_Page;
+use FS\ShortcodeSuite\Admin\Pages\Player_Types_Page;
+use FS\ShortcodeSuite\Admin\Pages\Selector_Wizard_Page;
+use FS\ShortcodeSuite\Admin\Pages\Product_Detail_Page;
 
 defined('ABSPATH') || exit;
 
@@ -70,6 +73,33 @@ final class Admin_Menu {
             'manage_options',
             'fs-shortcode-suite-size-guide',
             [new \FS\ShortcodeSuite\Admin\Pages\Size_Guide_Page(), 'render']
+        );
+        
+        add_submenu_page(
+            'fs-shortcode-suite',
+            'Player Types',
+            'Player Types',
+            'manage_options',
+            'fs-shortcode-suite-player-types',
+            [new \FS\ShortcodeSuite\Admin\Pages\Player_Types_Page(), 'render']
+        );
+        
+        add_submenu_page(
+            'fs-shortcode-suite',
+            'Selector Wizard',
+            'Selector Wizard',
+            'manage_options',
+            'fs-shortcode-selector-wizard',
+            [new \FS\ShortcodeSuite\Admin\Pages\Selector_Wizard_Page(), 'render']
+        );
+        
+        add_submenu_page(
+            'fs-shortcode-suite',
+            'Product Detail',
+            'Product Detail',
+            'manage_options',
+            'fs-shortcode-suite-product-detail',
+            [new \FS\ShortcodeSuite\Admin\Pages\Product_Detail_Page(), 'render']
         );
         
         add_submenu_page(

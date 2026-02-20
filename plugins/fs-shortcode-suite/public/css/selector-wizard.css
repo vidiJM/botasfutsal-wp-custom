@@ -1,0 +1,129 @@
+.fs-selector__trigger {
+    padding: 18px 40px;
+    background: #111827;
+    color: #fff;
+    border-radius: 0.5rem;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+}
+
+.fs-wizard {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    width:100%;
+    height: 100%;
+    max-width: none!important;;
+}
+
+.fs-wizard__overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,.65);
+}
+
+.fs-wizard__container {
+    position: relative;
+    max-width: 800px;
+    margin: 100px auto;
+    background: #fff;
+    border-radius: 0.5rem;
+    padding: 60px;
+    z-index: 2;
+}
+
+.fs-wizard__close {
+    position: absolute;
+    top: 20px;
+    right: 25px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+}
+
+.fs-wizard__progress {
+    height: 4px;
+    background: #eee;
+    margin-bottom: 40px;
+}
+
+.fs-wizard__progress-bar {
+    height: 100%;
+    width: 0%;
+    background: #84cc16;
+    transition: width .4s ease;
+}
+
+.fs-wizard__slide {
+    display: none;
+    
+}
+
+.fs-wizard__slide.active {
+    display: block;
+    font-size: 20px!important;
+    font-weight: 400!important;
+}
+
+.fs-wizard__options {
+    display: grid;
+    gap: 16px;
+    margin-top: 30px;
+}
+
+.fs-wizard__options button {
+    padding: 16px;
+    border-radius: 0.5rem;
+    border: 1px solid #e5e7eb;
+    background: #f9fafb;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all .2s ease;
+}
+
+.fs-wizard__options button:hover {
+    background: #111827;
+    color: #fff;
+}
+
+.fs-wizard__footer {
+    margin-top: 40px;
+}
+
+.fs-wizard__back {
+    background: none;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+}
+.fs-wizard__results {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 30px;
+    margin-top: 40px;
+}
+
+.fs-result-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 8px 30px rgba(0,0,0,.05);
+}
+
+.fs-result-card img {
+    width: 100%;
+    height: auto;
+    margin-bottom: 15px;
+}
+
+.fs-result-card h3 {
+    font-size: 18px;
+    margin-bottom: 8px;
+}
+
+.fs-result-card p {
+    font-weight: 600;
+}

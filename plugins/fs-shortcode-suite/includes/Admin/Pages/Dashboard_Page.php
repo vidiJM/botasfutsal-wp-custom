@@ -101,7 +101,23 @@ final class Dashboard_Page {
                                 <h3>FS Size Guide</h3>
                                 <span class="fs-pill">[fs_size_guide]</span>
                             </div>
-                            <p>Búsqueda fullscreen con REST.</p>
+                            <p>Página con Guía de Tallas.</p>
+                        </a>
+                        
+                        <a href="<?php echo esc_url(admin_url('admin.php?page=fs_player_types')); ?>" class="fs-tile">
+                            <div class="fs-tile__top">
+                                <h3>FS Player Types</h3>
+                                <span class="fs-pill">[fs_player_types]</span>
+                            </div>
+                            <p>Sección Home Player Types.</p>
+                        </a>
+                        
+                        <a href="<?php echo esc_url(admin_url('admin.php?page=fs-shortcode-selector-wizard')); ?>" class="fs-tile">
+                            <div class="fs-tile__top">
+                                <h3>FS Selector Wizard</h3>
+                                <span class="fs-pill">[fs_selector_wizard]</span>
+                            </div>
+                            <p>Sección Home Selector Wizard.</p>
                         </a>
                     </div>
                 </div>

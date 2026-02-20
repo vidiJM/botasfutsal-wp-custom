@@ -11,10 +11,14 @@ use FS\ShortcodeSuite\Admin\Admin_Menu;
 use FS\ShortcodeSuite\Shortcodes\Product_Grid;
 use FS\ShortcodeSuite\Shortcodes\Product_Search;
 use FS\ShortcodeSuite\Shortcodes\Size_Guide;
+use FS\ShortcodeSuite\Shortcodes\Player_Types;
+use FS\ShortcodeSuite\Shortcodes\Selector_Wizard;
+use FS\ShortcodeSuite\Shortcodes\Product_Detail;
 use FS\ShortcodeSuite\Data\Services\Search_Service;
 use FS\ShortcodeSuite\Data\Services\Grid_Service;
 use FS\ShortcodeSuite\REST\Search_Controller;
 use FS\ShortcodeSuite\REST\Grid_Controller;
+use FS\ShortcodeSuite\REST\Selector_Wizard_Controller;
 
 
 defined('ABSPATH') || exit;
@@ -38,11 +42,15 @@ final class Loader
     private function boot_shortcodes(): void
     {
         new Product_Search();
+        new Selector_Wizard();
     }
     
     private function boot_misc_shortcodes(): void
     {
         new Size_Guide();
+        new Player_Types();
+        new Selector_Wizard();
+        new Product_Detail();
     }
     
     private function boot_grid_system(): void
@@ -77,6 +85,11 @@ final class Loader
         
         add_action('rest_api_init', function () use ($service) {
             $controller = new Search_Controller($service);
+            $controller->register_routes();
+        });
+        
+        add_action('rest_api_init', function () {
+            $controller = new Selector_Wizard_Controller();
             $controller->register_routes();
         });
     }

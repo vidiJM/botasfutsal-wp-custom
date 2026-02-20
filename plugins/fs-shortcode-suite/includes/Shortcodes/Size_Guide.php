@@ -10,9 +10,7 @@ defined('ABSPATH') || exit;
 final class Size_Guide {
 
     public function __construct() {
-        error_log('Size Guide loaded');
         add_shortcode('fs_size_guide', [$this, 'render']);
-        error_log('Size Guide loaded');
     }
 
     public function render(): string {
