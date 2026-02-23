@@ -1,7 +1,6 @@
 <?php
 defined('ABSPATH') || exit;
-
-use FS\ShortcodeSuite\Query\ProductQuery;
+require_once WP_PLUGIN_DIR . '/fs-shortcode-suite/src/Query/ProductQuery.php';
 
 get_header();
 
@@ -26,7 +25,7 @@ $per_page = 12;
 ====================================================
 */
 
-$result = ProductQuery::get_products([
+$result = \FS\ShortcodeSuite\Query\ProductQuery::get_products([
     'genero'     => $current_genero,
     'superficie' => $current_superficie,
     'marca'      => $current_marca,
@@ -196,9 +195,9 @@ if (!empty($colores_raw) && !is_wp_error($colores_raw)) {
 
             <h2 class="fs-archive__title" style="font-size:30px;font-style: normal;font-weight: 600;letter-spacing: 1px;line-height: 1.5;">
                 <?php post_type_archive_title(); ?>
-            </h1>
+            </h2>
 
-            <p class="fs-archive__description" style="font-size:15px;font-style: normal;font-weight: 500line-height: 1.3;">
+            <p class="fs-archive__description" style="font-size:15px;font-style: normal;font-weight: 500;line-height: 1.3;">
                 Encuentra las mejores zapatillas de fútbol sala para hombre, mujer, infantil y unisex.
                 Modelos indoor, turf y multisuperficie al mejor precio.
             </p>
