@@ -104,7 +104,7 @@ final class Dashboard_Page {
                             <p>Página con Guía de Tallas.</p>
                         </a>
                         
-                        <a href="<?php echo esc_url(admin_url('admin.php?page=fs_player_types')); ?>" class="fs-tile">
+                        <a href="<?php echo esc_url(admin_url('admin.php?page=fs_player-types')); ?>" class="fs-tile">
                             <div class="fs-tile__top">
                                 <h3>FS Player Types</h3>
                                 <span class="fs-pill">[fs_player_types]</span>
@@ -112,12 +112,20 @@ final class Dashboard_Page {
                             <p>Sección Home Player Types.</p>
                         </a>
                         
-                        <a href="<?php echo esc_url(admin_url('admin.php?page=fs-shortcode-selector-wizard')); ?>" class="fs-tile">
+                        <a href="<?php echo esc_url(admin_url('admin.php?page=fs-shortcode-suite-selector-wizard')); ?>" class="fs-tile">
                             <div class="fs-tile__top">
                                 <h3>FS Selector Wizard</h3>
                                 <span class="fs-pill">[fs_selector_wizard]</span>
                             </div>
                             <p>Sección Home Selector Wizard.</p>
+                        </a>
+                        
+                        <a href="<?php echo esc_url(admin_url('admin.php?page=fs-shortcode-suite-product-detail')); ?>" class="fs-tile">
+                            <div class="fs-tile__top">
+                                <h3>FS Product Detail</h3>
+                                <span class="fs-pill">[fs_product_detail]</span>
+                            </div>
+                            <p>Sección Home Product Detail.</p>
                         </a>
                     </div>
                 </div>

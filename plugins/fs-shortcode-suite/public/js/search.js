@@ -64,10 +64,17 @@ document.addEventListener('DOMContentLoaded', () => {
         multicolor:'#999999'
     };
 
-    const normalize = (str) => str.trim().toLowerCase();
+    const normalize = (str) => {
+        if (typeof str !== "string") return "";
+        return str.trim().toLowerCase();
+    };
     const resolveHex = (colorName) => {
         const key = normalize(colorName);
         return COLOR_MAP[key] || '#CCCCCC';
+    };
+
+    const isTermObjectArray = (arr) => {
+        return Array.isArray(arr) && arr.length > 0 && typeof arr[0] === "object" && arr[0] !== null && ("slug" in arr[0]);
     };
 
     /* =============================
@@ -320,11 +327,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (Array.isArray(values) && key === 'color') {
 
+                // Puede venir como ["rojo", "azul"] o como [{slug,name,count}, ...]
+                const colorSlugs = isTermObjectArray(values)
+                    ? values.map(v => normalize(v.slug))
+                    : values.map(v => normalize(String(v)));
+
                 const unique = new Map();
 
-                values.forEach(slug => {
+                colorSlugs.forEach(slug => {
 
-                    const normalizedSlug = normalize(slug);
+                    const normalizedSlug = slug;
                     const parts = normalizedSlug.split('-');
                     const hexParts = parts.map(resolveHex);
                     const hexKey = [...hexParts].sort().join('|');
@@ -372,25 +384,50 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (Array.isArray(values)) {
 
-                container.innerHTML = values.map(val => `
-                    <button type="button"
-                        data-filter="${key}"
-                        data-value="${val}"
-                        class="${activeFilters[key] === val ? 'active' : ''}">
-                        ${val}
-                    </button>
-                `).join('');
+                // Arrays pueden venir como ["adidas", ...] o como [{slug,name,count}, ...]
+                if (isTermObjectArray(values)) {
+                    container.innerHTML = values.map(term => {
+                        const slug = normalize(term.slug);
+                        const label = term.name ?? term.slug;
+                        const count = Number(term.count ?? 0);
+                        const text = Number.isFinite(count) && count > 0 ? `${label} (${count})` : label;
+                        return `
+                            <button type="button"
+                                data-filter="${key}"
+                                data-value="${slug}"
+                                class="${activeFilters[key] === slug ? 'active' : ''}">
+                                ${text}
+                            </button>
+                        `;
+                    }).join('');
+                } else {
+                    container.innerHTML = values.map(val => {
+                        const v = normalize(String(val));
+                        return `
+                            <button type="button"
+                                data-filter="${key}"
+                                data-value="${v}"
+                                class="${activeFilters[key] === v ? 'active' : ''}">
+                                ${val}
+                            </button>
+                        `;
+                    }).join('');
+                }
 
             } else {
 
-                container.innerHTML = Object.entries(values).map(([slug, label]) => `
-                    <button type="button"
-                        data-filter="${key}"
-                        data-value="${slug}"
-                        class="${activeFilters[key] === slug ? 'active' : ''}">
-                        ${label}
-                    </button>
-                `).join('');
+                // Objeto mapa {slug: "Label"}
+                container.innerHTML = Object.entries(values).map(([slug, label]) => {
+                    const s = normalize(String(slug));
+                    return `
+                        <button type="button"
+                            data-filter="${key}"
+                            data-value="${s}"
+                            class="${activeFilters[key] === s ? 'active' : ''}">
+                            ${label}
+                        </button>
+                    `;
+                }).join('');
             }
 
         });

@@ -122,6 +122,7 @@
     const thumbsContainer = root.querySelector(".fs-product-detail__thumbs");
     const prevBtn = root.querySelector(".fs-product-detail__nav--prev");
     const nextBtn = root.querySelector(".fs-product-detail__nav--next");
+    const descriptionContainer = root.querySelector(".fs-product-detail__description");
 
     if (!colorsContainer || !sizesContainer || !priceContainer || !mainImage) {
       return;
@@ -133,6 +134,27 @@
     const state = {
       activeColor: colorKeys[0],
       activeImageIndex: 0
+    };
+
+    /* ===========================
+       DESCRIPTION
+    ============================ */
+
+    const renderDescription = (html) => {
+
+      if (!descriptionContainer) return;
+
+      if (!html || html.trim() === "") {
+        descriptionContainer.innerHTML = "";
+        descriptionContainer.style.display = "none";
+        return;
+      }
+
+      descriptionContainer.style.display = "";
+      descriptionContainer.innerHTML = html;
+
+      // Reset scroll si lo hubiera
+      descriptionContainer.scrollTop = 0;
     };
 
     /* ===========================
@@ -150,6 +172,7 @@
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "fs-product-detail__thumb";
+
         if (idx === state.activeImageIndex) {
           btn.classList.add("is-active");
         }
@@ -175,7 +198,13 @@
       if (!images.length) return;
 
       const src = images[state.activeImageIndex];
+
+      mainImage.classList.add("is-loading");
       mainImage.src = src;
+
+      mainImage.onload = () => {
+        mainImage.classList.remove("is-loading");
+      };
 
       if (thumbsContainer) {
         thumbsContainer.querySelectorAll(".fs-product-detail__thumb")
@@ -207,7 +236,7 @@
     if (nextBtn) nextBtn.addEventListener("click", () => navigate(1));
 
     /* ===========================
-       RENDER SIZES
+       SIZES
     ============================ */
 
     const renderSizes = (sizes) => {
@@ -225,7 +254,11 @@
 
     const renderPriceAndCta = (price, url) => {
       priceContainer.textContent = formatPrice(price);
-      if (cta) cta.href = url || "#";
+
+      if (cta) {
+        cta.href = url || "#";
+        cta.classList.toggle("is-disabled", !url);
+      }
     };
 
     /* ===========================
@@ -284,6 +317,7 @@
       renderThumbs(images);
       renderSizes(c.sizes || []);
       renderPriceAndCta(c.price, c.shop_url);
+      renderDescription(c.description || "");
     };
 
     renderColorDots();

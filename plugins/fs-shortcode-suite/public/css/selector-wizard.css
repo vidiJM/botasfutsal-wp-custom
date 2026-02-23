@@ -1,10 +1,10 @@
 .fs-selector__trigger {
     padding: 18px 40px;
     background: #111827;
-    color: #fff;
-    border-radius: 0.5rem;
-    border: none;
-    font-size: 18px;
+    color: #84CC16;
+    border-radius: 4px;
+    border: 1px solid #84CC16;;
+    font-size: 16px;
     cursor: pointer;
 }
 
@@ -28,7 +28,7 @@
     max-width: 800px;
     margin: 100px auto;
     background: #fff;
-    border-radius: 0.5rem;
+    border-radius: 4px;
     padding: 60px;
     z-index: 2;
 }
@@ -75,7 +75,7 @@
 
 .fs-wizard__options button {
     padding: 16px;
-    border-radius: 0.5rem;
+    border-radius: 4px;
     border: 1px solid #e5e7eb;
     background: #f9fafb;
     cursor: pointer;

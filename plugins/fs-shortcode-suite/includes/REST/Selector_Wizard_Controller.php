@@ -3,162 +3,81 @@ declare(strict_types=1);
 
 namespace FS\ShortcodeSuite\REST;
 
+use FS\ShortcodeSuite\Data\Services\Search_Service;
 use WP_REST_Request;
 use WP_REST_Response;
+use WP_Error;
 
-if (!defined('ABSPATH')) {
-    exit;
-}
+defined('ABSPATH') || exit;
 
 final class Selector_Wizard_Controller
 {
+    private Search_Service $service;
+
+    public function __construct(Search_Service $service)
+    {
+        $this->service = $service;
+    }
+
     public function register_routes(): void
     {
         register_rest_route(
             'fs/v1',
             '/wizard',
             [
-                'methods'  => 'POST',
-                'callback' => [$this, 'handle'],
+                'methods'             => 'POST',
+                'callback'            => [$this, 'handleWizard'],
                 'permission_callback' => '__return_true',
+                'args'                => [
+                    'gender'  => ['type' => 'string', 'required' => false],
+                    'surface' => ['type' => 'string', 'required' => false],
+                    'closure' => ['type' => 'string', 'required' => false],
+                    'budget'  => ['type' => 'string', 'required' => false],
+                ],
             ]
         );
     }
-    
-    public function handle(WP_REST_Request $request): WP_REST_Response
+
+    public function handleWizard(WP_REST_Request $request): WP_REST_Response
     {
-        $params = $request->get_json_params();
-    
-        $gender  = $params[0] ?? null;   // hombre | mujer | infantil
-        $surface = $params[1] ?? null;   // indoor | cesped | exterior
-        $style   = $params[2] ?? null;
-    
-        if (!$gender || !$surface) {
-            return new WP_REST_Response([], 200);
-        }
-    
-        /*
-        |--------------------------------------------------------------------------
-        | 1️⃣ Buscar variantes por tax_query
-        |--------------------------------------------------------------------------
-        */
-    
-        $tax_query = [
-            'relation' => 'AND',
-        ];
-    
-        if ($gender === 'infantil') {
-    
-            $tax_query[] = [
-                'taxonomy' => 'fs_age_group',
-                'field'    => 'slug',
-                'terms'    => ['kids', 'junior', 'toddler'],
-            ];
-    
-        } else {
-    
-            $tax_query[] = [
-                'taxonomy' => 'fs_age_group',
-                'field'    => 'slug',
-                'terms'    => ['adult'],
-            ];
-    
-            $tax_query[] = [
-                'taxonomy' => 'fs_genero',
-                'field'    => 'slug',
-                'terms'    => [$gender, 'unisex'],
-            ];
-        }
-    
-        $variant_query = new \WP_Query([
-            'post_type'      => 'fs_variante',
-            'posts_per_page' => -1,
-            'tax_query'      => $tax_query,
-            'fields'         => 'ids'
-        ]);
-    
-        if (!$variant_query->posts) {
-            return new WP_REST_Response([], 200);
-        }
-    
-        /*
-        |--------------------------------------------------------------------------
-        | 2️⃣ Extraer internal product_id
-        |--------------------------------------------------------------------------
-        */
-    
-        $internal_ids = [];
-    
-        foreach ($variant_query->posts as $variant_id) {
-    
-            $internal_id = get_field('fs_product_id', $variant_id);
-    
-            if ($internal_id) {
-                $internal_ids[] = $internal_id;
+        try {
+            $params = (array) $request->get_json_params();
+
+            if (empty($params)) {
+                return new WP_REST_Response([], 200);
             }
-        }
-    
-        $internal_ids = array_unique($internal_ids);
-    
-        if (empty($internal_ids)) {
-            return new WP_REST_Response([], 200);
-        }
-    
-        /*
-        |--------------------------------------------------------------------------
-        | 3️⃣ Buscar productos por:
-        |    - fs_product_id
-        |    - fs_superficie_available
-        |--------------------------------------------------------------------------
-        */
-    
-        $meta_query = [
-            'relation' => 'AND',
-    
-            [
-                'key'     => 'fs_product_id',
-                'value'   => $internal_ids,
-                'compare' => 'IN'
-            ],
-    
-            [
-                'key'     => 'fs_superficie_available',
-                'value'   => $surface,
-                'compare' => 'LIKE'
-            ]
-        ];
-    
-        $product_query = new \WP_Query([
-            'post_type'      => 'fs_producto',
-            'posts_per_page' => 3,
-            'meta_query'     => $meta_query
-        ]);
-    
-        if (!$product_query->posts) {
-            return new WP_REST_Response([], 200);
-        }
-    
-        /*
-        |--------------------------------------------------------------------------
-        | 4️⃣ Formatear respuesta
-        |--------------------------------------------------------------------------
-        */
-    
-        $results = [];
-    
-        foreach ($product_query->posts as $product) {
-    
-            $results[] = [
-                'id'    => $product->ID,
-                'title' => get_the_title($product->ID),
-                'link'  => get_permalink($product->ID),
-                'image' => get_field('fs_image_main_url', $product->ID),
-                'price' => get_field('fs_price_min', $product->ID),
+
+            $filters = [
+                'gender'  => isset($params['gender'])  ? sanitize_text_field((string) $params['gender'])  : null,
+                'surface' => isset($params['surface']) ? sanitize_text_field((string) $params['surface']) : null,
+                'closure' => isset($params['closure']) ? sanitize_text_field((string) $params['closure']) : null,
+                'budget'  => isset($params['budget'])  ? sanitize_text_field((string) $params['budget'])  : null,
             ];
+
+            $filters = array_filter(
+                $filters,
+                static fn($value) => $value !== null && $value !== ''
+            );
+
+            if (empty($filters)) {
+                return new WP_REST_Response([], 200);
+            }
+
+            $products = $this->service->wizard_search($filters);
+
+            return new WP_REST_Response(is_array($products) ? $products : [], 200);
+
+        } catch (\Throwable $e) {
+            error_log('[Selector_Wizard_Controller] ' . $e->getMessage());
+
+            return new WP_REST_Response(
+                new WP_Error(
+                    'wizard_error',
+                    'Error processing wizard request.',
+                    ['status' => 500]
+                ),
+                500
+            );
         }
-    
-        return new WP_REST_Response($results, 200);
     }
-
-
 }

@@ -23,6 +23,9 @@ final class VariantDTO
     public array $genderRaw = [];
     public ?string $gtin = null;
     public ?string $colorRaw = null;
+    
+    /** @var array<string> lista de cierres detectados */
+    public array $closures = [];
 
     /**
      * Devuelve la clave de color normalizada (mayúsculas, sin espacios extremos).

@@ -1,48 +1,66 @@
 <?php
-/**
- * Plugin Name: FS Shortcode Suite
- * Plugin URI: https://botasfutsal.com
- * Description: Motor profesional de shortcodes optimizados para BOTASFUTSAL.
- * Version: 1.0.0
- * Author: Vidal Joven 
- * Author URI: https://botasfutsal.com
- * Text Domain: fs-shortcode-suite
- */
-
 declare(strict_types=1);
 
-if (!defined('ABSPATH')) {
-    exit;
-}
+/**
+ * Plugin Name: FS Shortcode Suite
+ */
 
-define('FS_SC_SUITE_PATH', plugin_dir_path(__FILE__));
-define('FS_SC_SUITE_URL', plugin_dir_url(__FILE__));
-define('FS_SC_SUITE_VERSION', '1.0.0');
+defined('ABSPATH') || exit;
 
 /*
 |--------------------------------------------------------------------------
-| PSR-4 Autoloader
+| Constants
 |--------------------------------------------------------------------------
 */
 
-spl_autoload_register(function (string $class) {
+if (!defined('FS_SC_SUITE_PATH')) {
+    define('FS_SC_SUITE_PATH', plugin_dir_path(__FILE__));
+}
 
-    if (strpos($class, 'FS\\ShortcodeSuite\\') !== 0) {
-        return;
-    }
+if (!defined('FS_SC_SUITE_URL')) {
+    define('FS_SC_SUITE_URL', plugin_dir_url(__FILE__));
+}
 
-    $relative = str_replace(
-        ['FS\\ShortcodeSuite\\', '\\'],
-        ['', '/'],
-        $class
-    );
+if (!defined('FS_SC_SUITE_VERSION')) {
+    define('FS_SC_SUITE_VERSION', '1.0.0');
+}
 
-    $file = FS_SC_SUITE_PATH . 'includes/' . $relative . '.php';
+/*
+|--------------------------------------------------------------------------
+| Simple PSR-4 Autoloader (internal only)
+|--------------------------------------------------------------------------
+*/
 
-    if (file_exists($file)) {
-        require_once $file;
-    }
-});
+if (!class_exists(\FS\ShortcodeSuite\Core\Loader::class)) {
+
+    spl_autoload_register(function ($class) {
+
+        $prefix = 'FS\\ShortcodeSuite\\';
+    
+        if (strncmp($prefix, $class, strlen($prefix)) !== 0) {
+            return;
+        }
+    
+        $relative_class = substr($class, strlen($prefix));
+        $relative_path  = str_replace('\\', '/', $relative_class) . '.php';
+    
+        // 1️⃣ Buscar en src/
+        $file = FS_SC_SUITE_PATH . 'src/' . $relative_path;
+    
+        if (is_readable($file)) {
+            require $file;
+            return;
+        }
+    
+        // 2️⃣ Buscar en includes/
+        $file = FS_SC_SUITE_PATH . 'includes/' . $relative_path;
+    
+        if (is_readable($file)) {
+            require $file;
+            return;
+        }
+    });
+}
 
 /*
 |--------------------------------------------------------------------------
@@ -50,5 +68,6 @@ spl_autoload_register(function (string $class) {
 |--------------------------------------------------------------------------
 */
 
-$loader = new FS\ShortcodeSuite\Core\Loader();
-$loader->init();
+add_action('plugins_loaded', static function (): void {
+    (new FS\ShortcodeSuite\Core\Loader())->init();
+});

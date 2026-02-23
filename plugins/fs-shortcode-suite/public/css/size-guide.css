@@ -34,7 +34,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 18px 20px;
-  border-radius: 14px;
+  border-radius: 4px;
   text-decoration: none;
   border: 1px solid #e6e8eb;
   transition: all .2s ease;
@@ -108,7 +108,7 @@
 .fs-size-box {
   padding: 20px;
   border: 1px solid #e6e8eb;
-  border-radius: 14px;
+  border-radius: 4px;
   background: #fff;
   transition: all .2s ease;
 }
@@ -132,7 +132,7 @@
 .fs-player-btn {
   padding: 10px 16px;
   border: 1px solid #e6e8eb;
-  border-radius: 30px;
+  border-radius: 4px;
   background: #fff;
   cursor: pointer;
   font-size: 14px;
@@ -149,7 +149,7 @@
 .fs-player-recommendation {
   margin-top: 16px;
   padding: 16px;
-  border-radius: 12px;
+  border-radius: 4px;
   background: #f9fafb;
   font-size: 14px;
   color: #1F2A3F;

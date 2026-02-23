@@ -83,8 +83,8 @@ final class Product_Search
                                 'type'   => 'orderby',
                                 'static' => true,
                                 'items'  => [
-                                    ['value' => 'price_asc',  'text' => 'Precio ↑'],
-                                    ['value' => 'price_desc', 'text' => 'Precio ↓'],
+                                    ['value' => 'price_asc',  'text' => 'Precio'],
+                                    ['value' => 'price_desc', 'text' => 'Precio'],
                                     ['value' => 'newest',     'text' => 'Más nuevos'],
                                 ],
                             ],

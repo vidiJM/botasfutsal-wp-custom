@@ -190,10 +190,20 @@ final class Assets {
     |--------------------------------------------------------------------------
     */
 
-    public static function enqueue_selector_wizard(): void {
-
+    public static function enqueue_selector_wizard(): void
+    {
         wp_enqueue_style('fs-selector-wizard');
         wp_enqueue_script('fs-selector-wizard');
+    
+        // Inyecta config para JS (sin hardcodear /wp-json/)
+        wp_localize_script(
+            'fs-selector-wizard',
+            'FS_WIZARD',
+            [
+                'rest_url' => esc_url_raw(rest_url('fs/v1/wizard')),
+                'nonce'    => wp_create_nonce('wp_rest'),
+            ]
+        );
     }
     
     /*

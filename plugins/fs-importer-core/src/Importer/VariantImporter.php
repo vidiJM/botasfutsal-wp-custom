@@ -17,7 +17,6 @@ final class VariantImporter
             return 0;
         }
 
-        // Normaliza el color para usarlo como clave consistente
         $colorKey = static::normalizeColorKey($variant->color);
 
         $existing = get_posts([
@@ -47,15 +46,6 @@ final class VariantImporter
         update_post_meta($postId, 'fs_color_key', $colorKey);
         update_post_meta($postId, 'fs_variant_id', (string) ($variant->variantId ?? ''));
 
-        // Writer ACF opcional
-        $writer = static function (string $key, mixed $value) use ($postId): void {
-            if (function_exists('update_field')) {
-                update_field($key, $value, $postId);
-                return;
-            }
-            update_post_meta($postId, $key, $value);
-        };
-
         // =========================
         // IMÁGENES
         // =========================
@@ -68,7 +58,7 @@ final class VariantImporter
         )));
 
         if ($images) {
-            $writer('fs_images', implode("\n", $images));
+            update_post_meta($postId, 'fs_images', implode("\n", $images));
         }
 
         // =========================
@@ -84,37 +74,67 @@ final class VariantImporter
             );
         }
 
+        // ==========================================
+        // CIERRE (directamente desde título del feed)
+        // ==========================================
+        if (!empty($variant->rawTitle)) {
+
+            $title = strtoupper($variant->rawTitle);
+            $closures = [];
+
+            if (str_contains($title, 'VCO') || str_contains($title, 'VELCRO')) {
+                $closures[] = 'velcro';
+            }
+
+            if (str_contains($title, 'LACE') || str_contains($title, 'LACES')) {
+                $closures[] = 'cordones';
+            }
+
+            if (str_contains($title, 'ELASTIC')) {
+                $closures[] = 'elastic';
+            }
+
+            if (str_contains($title, 'SLIP ON') || str_contains($title, 'SLIP-ON')) {
+                $closures[] = 'sin-cordones';
+            }
+
+            if (!empty($closures)) {
+                TaxonomyAssigner::setMultiple(
+                    $postId,
+                    'fs_cierre',
+                    array_unique($closures)
+                );
+            }
+        }
+
         // =========================
         // TALLAS (solo ofertas con stock)
         // =========================
         $sizes = [];
-        
+
         if (!empty($variant->offers)) {
             foreach ($variant->offers as $offer) {
-        
+
                 if ($offer->inStock === true && !empty($offer->size)) {
-        
+
                     $size = trim((string) $offer->size);
-        
+
                     if ($size !== '') {
                         $sizes[$size] = true;
                     }
                 }
             }
         }
-        
+
         $sizes = array_keys($sizes);
-        
+
         if ($sizes) {
-        
-            // 1️⃣ Guardar taxonomía (para admin y filtros WP)
             TaxonomyAssigner::setMultiple(
                 $postId,
                 'fs_talla_eu',
                 $sizes
             );
-        
-            // 2️⃣ Guardar meta agregado (para ProductAggregator)
+
             update_post_meta(
                 $postId,
                 'fs_size_eu',

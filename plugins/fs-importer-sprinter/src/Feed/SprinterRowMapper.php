@@ -198,6 +198,7 @@ final class SprinterRowMapper
                 'price'            => $price,
                 'price_sale'       => ($salePrice > 0 && $salePrice < $price) ? $salePrice : null,
                 'merchant_name'    => $merchantName,
+                'title' => $titleRaw,
             ],
             'offer' => [
                 'merchant_id'    => $merchantIdRaw !== '' ? $merchantIdRaw : null,

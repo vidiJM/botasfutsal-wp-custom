@@ -9,8 +9,9 @@ use FS\ShortcodeSuite\Admin\Pages\Search_Page;
 use FS\ShortcodeSuite\Admin\Pages\Settings_Page;
 use FS\ShortcodeSuite\Admin\Pages\System_Page;
 use FS\ShortcodeSuite\Admin\Pages\Player_Types_Page;
-use FS\ShortcodeSuite\Admin\Pages\Selector_Wizard_Page;
 use FS\ShortcodeSuite\Admin\Pages\Product_Detail_Page;
+use FS\ShortcodeSuite\Admin\Pages\Selector_Wizard_Page;
+use FS\ShortcodeSuite\Admin\Pages\Products_Page;
 
 defined('ABSPATH') || exit;
 
@@ -89,7 +90,7 @@ final class Admin_Menu {
             'Selector Wizard',
             'Selector Wizard',
             'manage_options',
-            'fs-shortcode-selector-wizard',
+            'fs-shortcode-suite-selector-wizard',
             [new \FS\ShortcodeSuite\Admin\Pages\Selector_Wizard_Page(), 'render']
         );
         
@@ -100,6 +101,15 @@ final class Admin_Menu {
             'manage_options',
             'fs-shortcode-suite-product-detail',
             [new \FS\ShortcodeSuite\Admin\Pages\Product_Detail_Page(), 'render']
+        );
+        
+        add_submenu_page(
+            'fs-shortcode-suite',
+            'Products Page',
+            'Products Page',
+            'manage_options',
+            'fs-shortcode-suite-products-page',
+            [new \FS\ShortcodeSuite\Admin\Pages\Products_Page(), 'render']
         );
         
         add_submenu_page(

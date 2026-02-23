@@ -17,7 +17,7 @@
     justify-content: center;
 
     padding: 14px 22px;
-    border-radius: 0.5rem;
+    border-radius: 4px;
 
     background: #66b60f;
     color: #fff;
@@ -72,7 +72,7 @@
     flex-direction: column;
 
     background: #fff;
-    border-radius: 0.5rem;
+    border-radius: 4px;
     overflow: hidden;
 
     box-shadow: 0 25px 60px rgba(0, 0, 0, 0.2);
@@ -113,7 +113,7 @@
     height: 44px;
     padding: 0 14px;
 
-    border-radius: 0.5rem;
+    border-radius: 4px;
     border: 1px solid #e5e5e5;
 
     font-size: 16px;
@@ -130,7 +130,7 @@
     height: 40px;
     padding: 0 14px;
 
-    border-radius: 0.5rem;
+    border-radius: 4px;
     border: 1px solid #e5e5e5;
     background: #f5f5f5;
 
@@ -247,7 +247,7 @@
     text-align: center;
 
     padding: 10px 12px;
-    border-radius: 0.5rem;
+    border-radius: 4px;
     border: 1px solid #e5e5e5;
 
     background: #f4f4f4;
@@ -285,7 +285,7 @@
     text-decoration: none;
     color: inherit;
 
-    border-radius: 0.5rem;
+    border-radius: 4px;
     overflow: hidden;
 
     transition: transform 0.2s ease;
@@ -327,7 +327,7 @@
 @media (max-width: 992px) {
     .fs-search-panel {
         height: 92vh;
-        border-radius: 0.5rem;
+        border-radius: 4px;
     }
 
     .fs-search-layout {
@@ -349,7 +349,7 @@
 }
 .fs-search {
     width: 15rem;
-    border-radius: 0.5rem;
+    border-radius: 4px;
 }
 
 .fs-search-trigger {
@@ -368,7 +368,7 @@
     padding: 0 18px;
 
     background: #f5f5f5;
-    border-radius: 0.5rem;
+    border-radius: 4px;
     border: 1px solid #e5e5e5;
 
     font-size: 18px;
@@ -384,6 +384,8 @@
 
 .fs-search-placeholder {
     opacity: 0.7;
+    font-size: 14px!important;
+
 }
 /* CONTENEDOR */
 .fs-color-filter {
@@ -397,7 +399,7 @@
 /* DOT */
 .fs-color-dot {
     width: 14%!important;
-    border-radius: 0.5rem;
+    border-radius: 4px;
     cursor: pointer;
     transition: all .2s ease;
     padding: 0;

@@ -110,6 +110,7 @@ final class SprinterMapper
 
             if (!$variant) {
                 $variant = new VariantDTO();
+                $variant->closures = self::detectClosures($titleRaw);
                 $variant->variantId = $variantId;
                 $variant->color     = $colorBase;
 
@@ -184,5 +185,39 @@ final class SprinterMapper
         }
 
         return (float) str_replace(',', '.', $clean);
+    }
+    
+    /**
+     * Detecta los sistemas de cierre presentes en el título.
+     *
+     * @param string $title
+     * @return array<string>
+     */
+    private static function detectClosures(string $title): array
+    {
+        $title = strtoupper($title);
+        $closures = [];
+    
+        // Velcro
+        if (str_contains($title, 'VCO') || str_contains($title, 'VELCRO')) {
+            $closures[] = 'velcro';
+        }
+    
+        // Cordones
+        if (str_contains($title, 'LACE') || str_contains($title, 'LACES')) {
+            $closures[] = 'cordones';
+        }
+    
+        // Elástico
+        if (str_contains($title, 'ELASTIC')) {
+            $closures[] = 'elastic';
+        }
+    
+        // Slip-on
+        if (str_contains($title, 'SLIP ON') || str_contains($title, 'SLIP-ON')) {
+            $closures[] = 'sin-cordones';
+        }
+    
+        return array_values(array_unique($closures));
     }
 }

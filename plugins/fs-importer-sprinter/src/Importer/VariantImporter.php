@@ -132,7 +132,20 @@ final class VariantImporter
                 false
             );
         }
-
+        error_log('IMPORTER CLOSURES: ' . print_r($data['closures'] ?? 'NO CLOSURES', true));
+        // === CIERRE (desde mapper) ===
+        if (!empty($data['closures']) && is_array($data['closures'])) {
+            wp_set_object_terms(
+                $postId,
+                array_map(
+                    static fn(string $value): string => sanitize_text_field($value),
+                    $data['closures']
+                ),
+                'fs_cierre',
+                false
+            );
+        }
+        
         // === NUEVO: copiar fs_genero desde el producto padre ===
         $genero_terms = get_the_terms($productPostId, 'fs_genero');
         if (!empty($genero_terms) && !is_wp_error($genero_terms)) {
