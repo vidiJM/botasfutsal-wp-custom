@@ -64,7 +64,9 @@ final class Product_Search
                         autocomplete="off"
                         spellcheck="false"
                     >
-
+                    
+                    <div class="fs-active-filters" data-fs-active-filters></div>
+                    <button type="button" class="fs-clear-filters" data-fs-clear-filters>Limpiar</button>
                     <button class="fs-search-close" type="button">
                         <?php esc_html_e('Cancelar', 'fs-shortcode-suite'); ?>
                     </button>

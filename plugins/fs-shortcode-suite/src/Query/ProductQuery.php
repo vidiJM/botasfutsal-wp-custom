@@ -62,7 +62,7 @@ final class ProductQuery
         */
     
         $variant_external_ids = [];
-        $variant_prices = []; // external_variant_id => min price
+        $variant_prices = [];
     
         foreach ($offers->posts as $offer_id) {
     
@@ -86,12 +86,32 @@ final class ProductQuery
     
         /*
         ====================================================
-        3️⃣ Obtener variantes reales
+        3️⃣ Obtener variantes con filtros TAX (SUPERFICIE + COLOR)
         ====================================================
         */
-    
-        $variants = get_posts([
+        
+        $tax_query = ['relation' => 'AND'];
+        
+        if (!empty($args['superficie'])) {
+            $tax_query[] = [
+                'taxonomy' => 'fs_superficie',
+                'field'    => 'slug',
+                'terms'    => sanitize_title($args['superficie']),
+            ];
+        }
+        
+        if (!empty($args['color'])) {
+            $tax_query[] = [
+                'taxonomy' => 'fs_color',
+                'field'    => 'slug',
+                'terms'    => sanitize_title($args['color']),
+            ];
+        }
+        
+        $variant_query_args = [
             'post_type'      => 'fs_variante',
+            'posts_per_page' => -1,
+            'fields'         => 'ids',
             'meta_query'     => [
                 [
                     'key'     => 'fs_variant_id',
@@ -99,80 +119,22 @@ final class ProductQuery
                     'compare' => 'IN'
                 ]
             ],
-            'posts_per_page' => -1,
-            'fields'         => 'ids',
-        ]);
-    
+            'no_found_rows'  => true,
+        ];
+        
+        if (count($tax_query) > 1) {
+            $variant_query_args['tax_query'] = $tax_query;
+        }
+        
+        $variants = get_posts($variant_query_args);
+        
         if (empty($variants)) {
             return self::empty_result();
         }
     
         /*
         ====================================================
-        4️⃣ Aplicar filtros (igual que antes)
-        ====================================================
-        */
-    
-        if (!empty($args['genero'])) {
-    
-            $meta_genero = ['relation' => 'OR'];
-    
-            switch ($args['genero']) {
-    
-                case 'infantil':
-                    $meta_genero[] = [
-                        'key'     => 'age_group',
-                        'value'   => ['kids', 'junior', 'toddler'],
-                        'compare' => 'IN',
-                    ];
-                    break;
-    
-                case 'unisex':
-                    $meta_genero[] = [
-                        'key'   => 'gender',
-                        'value' => 'unisex',
-                    ];
-                    break;
-    
-                case 'hombre':
-                    $meta_genero[] = [
-                        'key'   => 'gender',
-                        'value' => 'male',
-                    ];
-                    $meta_genero[] = [
-                        'key'   => 'gender',
-                        'value' => 'unisex',
-                    ];
-                    break;
-    
-                case 'mujer':
-                    $meta_genero[] = [
-                        'key'   => 'gender',
-                        'value' => 'female',
-                    ];
-                    $meta_genero[] = [
-                        'key'   => 'gender',
-                        'value' => 'unisex',
-                    ];
-                    break;
-            }
-    
-            $variants = get_posts([
-                'post_type'      => 'fs_variante',
-                'post__in'       => $variants,
-                'meta_query'     => $meta_genero,
-                'posts_per_page' => -1,
-                'fields'         => 'ids',
-            ]);
-        }
-    
-        if (empty($variants)) {
-            return self::empty_result();
-        }
-    
-        /*
-        ====================================================
-        5️⃣ Mapear variantes → productos (sin query por variante)
+        4️⃣ Mapear variantes → productos
         ====================================================
         */
     
@@ -196,11 +158,18 @@ final class ProductQuery
             if (empty($product[0])) continue;
     
             $product_id = $product[0];
-            $product_ids[] = $product_id;
     
             /*
-            Imagen solo primera vez
+            🔥 APLICAR FILTRO MARCA AQUÍ
             */
+            if (!empty($args['marca'])) {
+                if (!has_term(sanitize_title($args['marca']), 'fs_marca', $product_id)) {
+                    continue;
+                }
+            }
+    
+            $product_ids[] = $product_id;
+    
             if (!isset($images[$product_id])) {
     
                 $images_raw = get_field('fs_images', $variant_id);
@@ -218,9 +187,6 @@ final class ProductQuery
                 }
             }
     
-            /*
-            Precio mínimo desde variant_prices ya calculado
-            */
             $external_id = get_field('fs_variant_id', $variant_id);
     
             if ($external_id && isset($variant_prices[$external_id])) {
@@ -235,12 +201,6 @@ final class ProductQuery
     
         $product_ids = array_unique($product_ids);
         $total = count($product_ids);
-    
-        /*
-        ====================================================
-        6️⃣ Paginación manual
-        ====================================================
-        */
     
         $offset = ($args['paged'] - 1) * $args['per_page'];
         $paged_ids = array_slice($product_ids, $offset, $args['per_page']);

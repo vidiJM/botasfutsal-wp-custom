@@ -9,31 +9,53 @@ defined('ABSPATH') || exit;
 
 final class Search_Service
 {
-    private const LIMIT = 12;
+    private const LIMIT = 10;
 
     /* ============================================================
      *  SEARCH OVERLAY (PRODUCT BASE + OFFER AGGREGATION REAL)
      * ============================================================ */
-
     public function search(string $query = '', array $filters = []): array
     {
         $query = trim($query);
-
+    
+        /*
+         * ============================================================
+         *  1️⃣ QUERY LIMITADA (LIMIT + 1 para detectar has_more)
+         * ============================================================
+         */
         $limited_args = $this->build_query_args($query, $filters);
-        $limited_args['posts_per_page'] = self::LIMIT;
-
+        $limited_args['posts_per_page'] = self::LIMIT + 1;
+    
         $limited_query = new WP_Query($limited_args);
         $product_ids   = $limited_query->posts ?: [];
-
+    
+        // Detectar si hay más resultados
+        $has_more = count($product_ids) > self::LIMIT;
+    
+        if ($has_more) {
+            $product_ids = array_slice($product_ids, 0, self::LIMIT);
+        }
+    
+        /*
+         * ============================================================
+         *  2️⃣ DATASET COMPLETO PARA FACETS (sin límite)
+         * ============================================================
+         */
         $facet_args = $this->build_query_args($query, $filters);
         $facet_args['posts_per_page'] = -1;
-
+    
         $facet_query = new WP_Query($facet_args);
         $facet_ids   = $facet_query->posts ?: [];
-
+    
+        /*
+         * ============================================================
+         *  3️⃣ RESPONSE
+         * ============================================================
+         */
         return [
             'products' => $this->build_products($product_ids),
             'filters'  => $this->build_filters_dataset($facet_ids),
+            'has_more' => $has_more,
         ];
     }
 
@@ -86,23 +108,151 @@ final class Search_Service
 
     private function build_products(array $ids): array
     {
+        if (empty($ids)) {
+            return [];
+        }
+    
+        $ids = array_map('intval', $ids);
+    
+        /*
+         * ============================================================
+         *  1️⃣ VARIANTES MASIVAS POR PARENT
+         * ============================================================
+         */
+        $variant_ids = get_posts([
+            'post_type'      => 'fs_variante',
+            'post_status'    => 'publish',
+            'fields'         => 'ids',
+            'posts_per_page' => -1,
+            'no_found_rows'  => true,
+            'post_parent__in'=> $ids,
+        ]);
+    
+        $variants_by_product = [];
+        $variant_global_ids  = [];
+    
+        foreach ($variant_ids as $variant_id) {
+    
+            $variant_id = (int) $variant_id;
+            $product_id = (int) wp_get_post_parent_id($variant_id);
+    
+            if (!isset($variants_by_product[$product_id])) {
+                $variants_by_product[$product_id] = [];
+            }
+    
+            $variants_by_product[$product_id][] = $variant_id;
+    
+            $global_id = (string) get_post_meta($variant_id, 'fs_variant_id', true);
+            if ($global_id !== '') {
+                $variant_global_ids[$variant_id] = $global_id;
+            }
+        }
+    
+        /*
+         * ============================================================
+         *  2️⃣ OFERTAS MASIVAS
+         * ============================================================
+         */
+        $offers_by_variant = [];
+    
+        if (!empty($variant_global_ids)) {
+    
+            $offer_ids = get_posts([
+                'post_type'      => 'fs_oferta',
+                'post_status'    => 'publish',
+                'fields'         => 'ids',
+                'posts_per_page' => -1,
+                'no_found_rows'  => true,
+                'meta_query'     => [
+                    [
+                        'key'     => 'fs_variant_id',
+                        'value'   => array_values($variant_global_ids),
+                        'compare' => 'IN',
+                    ]
+                ],
+            ]);
+    
+            foreach ($offer_ids as $offer_id) {
+    
+                $offer_id = (int) $offer_id;
+    
+                $variant_id = array_search(
+                    get_post_meta($offer_id, 'fs_variant_id', true),
+                    $variant_global_ids,
+                    true
+                );
+    
+                if (!$variant_id) {
+                    continue;
+                }
+    
+                $offers_by_variant[$variant_id][] = $offer_id;
+            }
+        }
+    
+        /*
+         * ============================================================
+         *  3️⃣ CONSTRUIR OUTPUT
+         * ============================================================
+         */
         $out = [];
-
+    
         foreach ($ids as $product_id) {
-
-            [$price_min, $colors_count] = $this->get_product_aggregates((int)$product_id);
-
+    
+            $product_id = (int) $product_id;
+    
+            $min_price   = null;
+            $colors      = [];
+    
+            $variant_list = $variants_by_product[$product_id] ?? [];
+    
+            foreach ($variant_list as $variant_id) {
+    
+                // Colores
+                $color_terms = wp_get_post_terms($variant_id, 'fs_color');
+                if (!empty($color_terms) && !is_wp_error($color_terms)) {
+                    foreach ($color_terms as $term) {
+                        $colors[$term->slug] = true;
+                    }
+                }
+    
+                $offer_list = $offers_by_variant[$variant_id] ?? [];
+    
+                foreach ($offer_list as $offer_id) {
+    
+                    $in_stock = get_post_meta($offer_id, 'fs_in_stock', true);
+    
+                    if (in_array($in_stock, ['0', 0, false, 'false', '', null], true)) {
+                        continue;
+                    }
+    
+                    $price_raw      = (string) get_post_meta($offer_id, 'fs_price', true);
+                    $price_sale_raw = (string) get_post_meta($offer_id, 'fs_price_sale', true);
+    
+                    $price      = (float) str_replace(',', '.', $price_raw);
+                    $price_sale = (float) str_replace(',', '.', $price_sale_raw);
+    
+                    $final = ($price_sale > 0) ? $price_sale : $price;
+    
+                    if ($final > 0) {
+                        $min_price = ($min_price === null)
+                            ? $final
+                            : min($min_price, $final);
+                    }
+                }
+            }
+    
             $out[] = [
-                'id'           => (int) $product_id,
+                'id'           => $product_id,
                 'name'         => get_the_title($product_id),
                 'permalink'    => get_permalink($product_id),
                 'image'        => (string) get_post_meta($product_id, 'fs_image_main_url', true),
-                'price_from'   => $price_min,
-                'brand'        => $this->get_brand((int)$product_id),
-                'colors_count' => $colors_count,
+                'price_from'   => $min_price,
+                'brand'        => $this->get_brand($product_id),
+                'colors_count' => count($colors),
             ];
         }
-
+    
         return $out;
     }
 
@@ -112,6 +262,18 @@ final class Search_Service
 
     private function build_filters_dataset(array $product_ids): array
     {
+        if (empty($product_ids)) {
+            return [
+                'talla'      => [],
+                'superficie' => [],
+                'color'      => [],
+                'marca'      => [],
+                'genero'     => [],
+                'price_min'  => null,
+                'price_max'  => null,
+            ];
+        }
+    
         $sizes     = [];
         $surfaces  = [];
         $colors    = [];
@@ -120,13 +282,15 @@ final class Search_Service
         $price_min = null;
         $price_max = null;
     
+        /*
+         * ============================================================
+         *  1️⃣ MARCAS Y GÉNEROS (PRODUCTO)
+         * ============================================================
+         */
         foreach ($product_ids as $product_id) {
     
             $product_id = (int) $product_id;
     
-            // =========================
-            // MARCA / GENERO (producto)
-            // =========================
             $brand_terms = wp_get_post_terms($product_id, 'fs_marca');
             if (!empty($brand_terms) && !is_wp_error($brand_terms)) {
                 foreach ($brand_terms as $term) {
@@ -140,127 +304,195 @@ final class Search_Service
                     $generos[$term->slug] = $term->name;
                 }
             }
+        }
     
-            // ==========================================
-            // VARIANTES DEL PRODUCTO (relación real: parent)
-            // ==========================================
-            $product_hash = get_post_meta($product_id, 'fs_product_id', true);
-
-            if (empty($product_hash)) {
-                continue;
+        /*
+         * ============================================================
+         *  2️⃣ OBTENER TODOS LOS PRODUCT_HASH
+         * ============================================================
+         */
+        $product_hashes = [];
+    
+        foreach ($product_ids as $product_id) {
+            $hash = get_post_meta((int) $product_id, 'fs_product_id', true);
+            if (!empty($hash)) {
+                $product_hashes[] = $hash;
             }
-            
-            $variant_ids = get_posts([
-                'post_type'      => 'fs_variante',
-                'post_status'    => 'publish',
-                'fields'         => 'ids',
-                'posts_per_page' => -1,
-                'no_found_rows'  => true,
-                'meta_query'     => [
-                    [
-                        'key'     => 'fs_product_id',
-                        'value'   => $product_hash,
-                        'compare' => '=',
-                    ]
+        }
+    
+        $product_hashes = array_unique($product_hashes);
+    
+        if (empty($product_hashes)) {
+            return [
+                'talla'      => [],
+                'superficie' => [],
+                'color'      => [],
+                'marca'      => $brands,
+                'genero'     => $generos,
+                'price_min'  => null,
+                'price_max'  => null,
+            ];
+        }
+    
+        /*
+         * ============================================================
+         *  3️⃣ QUERY MASIVA DE VARIANTES
+         * ============================================================
+         */
+        $variant_ids = get_posts([
+            'post_type'      => 'fs_variante',
+            'post_status'    => 'publish',
+            'fields'         => 'ids',
+            'posts_per_page' => -1,
+            'no_found_rows'  => true,
+            'meta_query'     => [
+                [
+                    'key'     => 'fs_product_id',
+                    'value'   => $product_hashes,
+                    'compare' => 'IN',
                 ]
-            ]);
+            ]
+        ]);
     
-            if (empty($variant_ids)) {
-                // si un producto no tiene variantes, no aporta a talla/color/superficie/precio
-                continue;
+        if (empty($variant_ids)) {
+            return [
+                'talla'      => [],
+                'superficie' => [],
+                'color'      => [],
+                'marca'      => $brands,
+                'genero'     => $generos,
+                'price_min'  => null,
+                'price_max'  => null,
+            ];
+        }
+    
+        /*
+         * ============================================================
+         *  4️⃣ SUPERFICIE Y COLOR (VARIANTE)
+         * ============================================================
+         */
+        foreach ($variant_ids as $variant_id) {
+    
+            $variant_id = (int) $variant_id;
+    
+            $surface_terms = wp_get_post_terms($variant_id, 'fs_superficie');
+            if (!empty($surface_terms) && !is_wp_error($surface_terms)) {
+                foreach ($surface_terms as $term) {
+                    $surfaces[$term->slug] = true;
+                }
             }
     
-            foreach ($variant_ids as $variant_id) {
-    
-                $variant_id = (int) $variant_id;
-    
-                // =========================
-                // SUPERFICIE (tax en variante)
-                // =========================
-                $surface_terms = wp_get_post_terms($variant_id, 'fs_superficie');
-                if (!empty($surface_terms) && !is_wp_error($surface_terms)) {
-                    foreach ($surface_terms as $term) {
-                        $surfaces[$term->slug] = true;
-                    }
-                }
-    
-                // =========================
-                // COLOR (tax en variante)
-                // =========================
-                $color_terms = wp_get_post_terms($variant_id, 'fs_color');
-                if (!empty($color_terms) && !is_wp_error($color_terms)) {
-                    foreach ($color_terms as $term) {
-                        $colors[$term->slug] = true;
-                    }
-                }
-    
-                // =========================
-                // OFERTAS (por fs_variant_id)
-                // =========================
-                $variant_global_id = (string) get_post_meta($variant_id, 'fs_variant_id', true);
-                if ($variant_global_id === '') {
-                    continue;
-                }
-    
-                $offer_ids = get_posts([
-                    'post_type'      => 'fs_oferta',
-                    'post_status'    => 'publish',
-                    'fields'         => 'ids',
-                    'posts_per_page' => -1,
-                    'no_found_rows'  => true,
-                    'meta_query'     => [
-                        [
-                            'key'     => 'fs_variant_id',
-                            'value'   => $variant_global_id,
-                            'compare' => '=',
-                        ],
-                    ],
-                ]);
-    
-                if (empty($offer_ids)) continue;
-    
-                foreach ($offer_ids as $offer_id) {
-    
-                    $offer_id = (int) $offer_id;
-    
-                    // Si sigues usando fs_in_stock en tu importador, cambia a:
-                    // $in_stock = get_post_meta($offer_id, 'fs_in_stock', true);
-                    $in_stock = get_post_meta($offer_id, 'fs_in_stock', true);
-
-                    if (in_array($in_stock, ['0', 0, false, 'false', '', null], true)) {
-                        continue;
-                    }
-                    
-                    // =========================
-                    // TALLA (tax en oferta)
-                    // =========================
-                    $size_terms = wp_get_post_terms($offer_id, 'fs_talla_eu');
-                    
-                    if (!empty($size_terms) && !is_wp_error($size_terms)) {
-                        foreach ($size_terms as $term) {
-                            $sizes[$term->slug] = true;
-                        }
-                    }
-    
-                    // =========================
-                    // PRECIO (meta en oferta)
-                    // =========================
-                    $price_raw      = (string) get_post_meta($offer_id, 'fs_price', true);
-                    $price_sale_raw = (string) get_post_meta($offer_id, 'fs_price_sale', true);
-    
-                    $price      = (float) str_replace(',', '.', $price_raw);
-                    $price_sale = (float) str_replace(',', '.', $price_sale_raw);
-    
-                    $final = ($price_sale > 0) ? $price_sale : $price;
-    
-                    if ($final > 0) {
-                        $price_min = ($price_min === null) ? $final : min($price_min, $final);
-                        $price_max = ($price_max === null) ? $final : max($price_max, $final);
-                    }
+            $color_terms = wp_get_post_terms($variant_id, 'fs_color');
+            if (!empty($color_terms) && !is_wp_error($color_terms)) {
+                foreach ($color_terms as $term) {
+                    $colors[$term->slug] = true;
                 }
             }
         }
     
+        /*
+         * ============================================================
+         *  5️⃣ OBTENER TODOS LOS VARIANT_GLOBAL_ID
+         * ============================================================
+         */
+        $variant_global_ids = [];
+    
+        foreach ($variant_ids as $variant_id) {
+            $global_id = (string) get_post_meta((int)$variant_id, 'fs_variant_id', true);
+            if ($global_id !== '') {
+                $variant_global_ids[] = $global_id;
+            }
+        }
+    
+        $variant_global_ids = array_unique($variant_global_ids);
+    
+        if (empty($variant_global_ids)) {
+            return [
+                'talla'      => [],
+                'superficie' => array_keys($surfaces),
+                'color'      => array_keys($colors),
+                'marca'      => $brands,
+                'genero'     => $generos,
+                'price_min'  => null,
+                'price_max'  => null,
+            ];
+        }
+    
+        /*
+         * ============================================================
+         *  6️⃣ QUERY MASIVA DE OFERTAS
+         * ============================================================
+         */
+        $offer_ids = get_posts([
+            'post_type'      => 'fs_oferta',
+            'post_status'    => 'publish',
+            'fields'         => 'ids',
+            'posts_per_page' => -1,
+            'no_found_rows'  => true,
+            'meta_query'     => [
+                [
+                    'key'     => 'fs_variant_id',
+                    'value'   => $variant_global_ids,
+                    'compare' => 'IN',
+                ],
+            ],
+        ]);
+    
+        if (empty($offer_ids)) {
+            return [
+                'talla'      => [],
+                'superficie' => array_keys($surfaces),
+                'color'      => array_keys($colors),
+                'marca'      => $brands,
+                'genero'     => $generos,
+                'price_min'  => null,
+                'price_max'  => null,
+            ];
+        }
+    
+        /*
+         * ============================================================
+         *  7️⃣ TALLA + PRECIO DESDE OFERTAS
+         * ============================================================
+         */
+        foreach ($offer_ids as $offer_id) {
+    
+            $offer_id = (int) $offer_id;
+    
+            $in_stock = get_post_meta($offer_id, 'fs_in_stock', true);
+    
+            if (in_array($in_stock, ['0', 0, false, 'false', '', null], true)) {
+                continue;
+            }
+    
+            // TALLAS
+            $size_terms = wp_get_post_terms($offer_id, 'fs_talla_eu');
+            if (!empty($size_terms) && !is_wp_error($size_terms)) {
+                foreach ($size_terms as $term) {
+                    $sizes[$term->slug] = true;
+                }
+            }
+    
+            // PRECIO
+            $price_raw      = (string) get_post_meta($offer_id, 'fs_price', true);
+            $price_sale_raw = (string) get_post_meta($offer_id, 'fs_price_sale', true);
+    
+            $price      = (float) str_replace(',', '.', $price_raw);
+            $price_sale = (float) str_replace(',', '.', $price_sale_raw);
+    
+            $final = ($price_sale > 0) ? $price_sale : $price;
+    
+            if ($final > 0) {
+                $price_min = ($price_min === null) ? $final : min($price_min, $final);
+                $price_max = ($price_max === null) ? $final : max($price_max, $final);
+            }
+        }
+    
+        /*
+         * ============================================================
+         *  8️⃣ ORDENACIÓN FINAL
+         * ============================================================
+         */
         ksort($brands);
         ksort($generos);
         ksort($surfaces);
@@ -283,41 +515,38 @@ final class Search_Service
     /* ============================================================
      *  PRODUCT AGGREGATES
      * ============================================================ */
-
     private function get_product_aggregates(int $product_id): array
     {
         $min_price = null;
         $colors    = [];
     
-        // ============================
-        // VARIANTES DEL PRODUCTO
-        // ============================
+        /*
+         * ============================================================
+         *  1️⃣ OBTENER VARIANTES POR PARENT (NO MÁS LIKE)
+         * ============================================================
+         */
         $variant_ids = get_posts([
             'post_type'      => 'fs_variante',
             'post_status'    => 'publish',
             'fields'         => 'ids',
             'posts_per_page' => -1,
             'no_found_rows'  => true,
-            'meta_query'     => [
-                [
-                    'key'     => 'fs_product_id',
-                    'value'   => (string) $product_id,
-                    'compare' => 'LIKE', // importante
-                ]
-            ],
+            'post_parent'    => $product_id,
         ]);
     
         if (empty($variant_ids)) {
             return [null, 0];
         }
     
+        /*
+         * ============================================================
+         *  2️⃣ COLORES DESDE VARIANTES
+         * ============================================================
+         */
         foreach ($variant_ids as $variant_id) {
     
             $variant_id = (int) $variant_id;
     
-            // ============================
-            // COLORES (tax en variante)
-            // ============================
             $color_terms = wp_get_post_terms($variant_id, 'fs_color');
             if (!empty($color_terms) && !is_wp_error($color_terms)) {
                 foreach ($color_terms as $term) {
@@ -326,56 +555,78 @@ final class Search_Service
                     }
                 }
             }
+        }
     
-            // ============================
-            // OFERTAS DE LA VARIANTE
-            // ============================
-            $variant_global_id = (string) get_post_meta($variant_id, 'fs_variant_id', true);
-            if ($variant_global_id === '') {
+        /*
+         * ============================================================
+         *  3️⃣ OBTENER TODOS LOS VARIANT_GLOBAL_ID
+         * ============================================================
+         */
+        $variant_global_ids = [];
+    
+        foreach ($variant_ids as $variant_id) {
+            $global_id = (string) get_post_meta((int)$variant_id, 'fs_variant_id', true);
+            if ($global_id !== '') {
+                $variant_global_ids[] = $global_id;
+            }
+        }
+    
+        $variant_global_ids = array_unique($variant_global_ids);
+    
+        if (empty($variant_global_ids)) {
+            return [null, count($colors)];
+        }
+    
+        /*
+         * ============================================================
+         *  4️⃣ QUERY MASIVA DE OFERTAS
+         * ============================================================
+         */
+        $offer_ids = get_posts([
+            'post_type'      => 'fs_oferta',
+            'post_status'    => 'publish',
+            'fields'         => 'ids',
+            'posts_per_page' => -1,
+            'no_found_rows'  => true,
+            'meta_query'     => [
+                [
+                    'key'     => 'fs_variant_id',
+                    'value'   => $variant_global_ids,
+                    'compare' => 'IN',
+                ]
+            ],
+        ]);
+    
+        if (empty($offer_ids)) {
+            return [null, count($colors)];
+        }
+    
+        /*
+         * ============================================================
+         *  5️⃣ CALCULAR PRECIO MÍNIMO
+         * ============================================================
+         */
+        foreach ($offer_ids as $offer_id) {
+    
+            $offer_id = (int) $offer_id;
+    
+            $in_stock = get_post_meta($offer_id, 'fs_in_stock', true);
+            if (in_array($in_stock, ['0', 0, false, 'false', '', null], true)) {
                 continue;
             }
     
-            $offer_ids = get_posts([
-                'post_type'      => 'fs_oferta',
-                'post_status'    => 'publish',
-                'fields'         => 'ids',
-                'posts_per_page' => -1,
-                'no_found_rows'  => true,
-                'meta_query'     => [
-                    [
-                        'key'     => 'fs_variant_id',
-                        'value'   => $variant_global_id,
-                        'compare' => '=',
-                    ]
-                ],
-            ]);
+            $price_raw      = (string) get_post_meta($offer_id, 'fs_price', true);
+            $price_sale_raw = (string) get_post_meta($offer_id, 'fs_price_sale', true);
     
-            if (empty($offer_ids)) {
-                continue;
-            }
+            $price      = (float) str_replace(',', '.', $price_raw);
+            $price_sale = (float) str_replace(',', '.', $price_sale_raw);
     
-            foreach ($offer_ids as $offer_id) {
+            $final = ($price_sale > 0) ? $price_sale : $price;
     
-                $offer_id = (int) $offer_id;
-    
-                $in_stock = get_post_meta($offer_id, 'fs_in_stock', true);
-                if (!$in_stock || $in_stock === '0' || $in_stock === 'false') {
-                    continue;
-                }
-    
-                $price_raw      = (string) get_post_meta($offer_id, 'fs_price', true);
-                $price_sale_raw = (string) get_post_meta($offer_id, 'fs_price_sale', true);
-    
-                $price      = (float) str_replace(',', '.', $price_raw);
-                $price_sale = (float) str_replace(',', '.', $price_sale_raw);
-    
-                $final = ($price_sale > 0) ? $price_sale : $price;
-    
-                if ($final > 0) {
-                    $min_price = ($min_price === null)
-                        ? $final
-                        : min($min_price, $final);
-                }
+            if ($final > 0) {
+                $min_price = ($min_price === null)
+                    ? $final
+                    : min($min_price, $final);
             }
         }
     
