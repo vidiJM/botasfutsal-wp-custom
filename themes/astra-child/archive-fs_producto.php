@@ -1,358 +1,496 @@
 <?php
-defined('ABSPATH') || exit;
-require_once WP_PLUGIN_DIR . '/fs-shortcode-suite/src/Query/ProductQuery.php';
+defined("ABSPATH") || exit();
+
+require_once WP_PLUGIN_DIR . "/fs-shortcode-suite/src/Query/ProductQuery.php";
 
 get_header();
 
-/*
-====================================================
+/* ====================================================
 1️⃣ Filtros GET
-====================================================
-*/
+==================================================== */
 
-$current_genero     = isset($_GET['genero']) ? sanitize_text_field($_GET['genero']) : '';
-$current_superficie = isset($_GET['superficie']) ? sanitize_text_field($_GET['superficie']) : '';
-$current_marca      = isset($_GET['marca']) ? sanitize_text_field($_GET['marca']) : '';
-$current_color      = isset($_GET['color']) ? sanitize_text_field($_GET['color']) : '';
-$current_precio_max = isset($_GET['precio_max']) ? (float) $_GET['precio_max'] : 0;
+$current_genero = isset($_GET["genero"])
+    ? sanitize_text_field($_GET["genero"])
+    : "";
+$current_superficie = isset($_GET["superficie"])
+    ? sanitize_text_field($_GET["superficie"])
+    : "";
+$current_marca = isset($_GET["marca"])
+    ? sanitize_text_field($_GET["marca"])
+    : "";
+$current_color = isset($_GET["color"])
+    ? sanitize_text_field($_GET["color"])
+    : "";
+$current_precio_max = isset($_GET["precio_max"])
+    ? (float) $_GET["precio_max"]
+    : 0;
 
-$paged    = get_query_var('paged') ? (int) get_query_var('paged') : 1;
+$paged = get_query_var("paged") ? (int) get_query_var("paged") : 1;
 $per_page = 12;
 
-/*
-====================================================
+/* ====================================================
 2️⃣ Query Offer-driven
-====================================================
-*/
+==================================================== */
 
 $result = \FS\ShortcodeSuite\Query\ProductQuery::get_products([
-    'genero'     => $current_genero,
-    'superficie' => $current_superficie,
-    'marca'      => $current_marca,
-    'color'      => $current_color,
-    'precio_max' => $current_precio_max,
-    'per_page'   => $per_page,
-    'paged'      => $paged,
+    "genero" => $current_genero,
+    "superficie" => $current_superficie,
+    "marca" => $current_marca,
+    "color" => $current_color,
+    "precio_max" => $current_precio_max,
+    "per_page" => $per_page,
+    "paged" => $paged,
 ]);
 
-$product_ids = $result['ids'] ?? [];
-$total       = $result['total'] ?? 0;
-$images      = $result['images'] ?? [];
-$prices      = $result['prices'] ?? [];
+$product_ids = $result["ids"] ?? [];
+$total = $result["total"] ?? 0;
+$images = $result["images"] ?? [];
+$prices = $result["prices"] ?? [];
 
-/*
-====================================================
-3️⃣ Datos para filtros
-====================================================
-*/
+/* ====================================================
+3️⃣ Datos filtros
+==================================================== */
 
-// Superficies
-$superficies = get_terms([
-    'taxonomy'   => 'fs_superficie',
-    'hide_empty' => false,
+$generos = [
+    "hombre" => "Hombre",
+    "mujer" => "Mujer",
+    "unisex" => "Unisex",
+    "infantil" => "Infantil",
+];
+
+$superficies = [
+    (object) ["slug" => "indoor", "name" => "Indoor"],
+    (object) ["slug" => "mixta", "name" => "Mixta"],
+    (object) ["slug" => "outdoor", "name" => "Outdoor"],
+    (object) ["slug" => "turf", "name" => "Turf"],
+];
+
+$brands = get_terms([
+    "taxonomy" => "fs_marca",
+    "hide_empty" => false,
+    "orderby" => "name",
+    "order" => "ASC",
 ]);
 
-// Marcas desde meta (limpio)
-global $wpdb;
-
-$brands_raw = $wpdb->get_col("
-    SELECT DISTINCT meta_value
-    FROM {$wpdb->postmeta}
-    WHERE meta_key = 'fs_brand_raw'
-    AND meta_value != ''
-    ORDER BY meta_value ASC
-");
-
-$brands = [];
-
-if (!empty($brands_raw)) {
-    foreach ($brands_raw as $brand) {
-
-        // Ignorar valores numéricos puros
-        if (is_numeric($brand)) {
-            continue;
-        }
-
-        $brands[] = strtolower(trim($brand));
-    }
+if (is_wp_error($brands)) {
+    $brands = [];
 }
 
-// Colores (normalizados visualmente)
-$colores_raw = get_terms([
-    'taxonomy'   => 'fs_color',
-    'hide_empty' => false,
-]);
+const COLOR_MAP = [
+        'negro'=>'#000000',
+        'blanco'=>'#FFFFFF',
+        'blanco_coral'=>'#F2ECDF',
+        'rojo'=>'#FF0000',
+        'azul'=>'#0000FF',
+        'azul_marino' =>'#000080',
+        'azul_claro' =>'#90D5FF',
+        'azul_fucsia'=>'#6A00FF',
+        'azul_royal'=>'#4169E1',
+        'verde'=>'#008000',
+        'verde_fluor'=>'#39FF14',
+        'amarillo'=>'#FFFF00',
+        'amarillo_fluor'=>'#CCFF00',
+        'naranja'=>'#FFA500',
+        'gris'=>'#808080',
+        'gris_claro'=>'#CDCDCD',
+        'rosa'=>'#FFC0CB',
+        'morado'=>'#800080',
+        'turquesa'=>'#40E0D0',
+        'oro'=>'#FFD700',
+        'plata'=>'#C0C0C0',
+        'beige'=>'#F5F5DC',
+        'marron'=>'#8B4513',
+        'marrón'=>'#8B4513',
+        'cuero'=>'#AC7434',
+        'lima'=>'#99FF33',
+        'royal'=>'#4169E1',
+        'marino'=>'#000080',
+        'bordeaux'=>'#800000',
+        'neon'=>'#39FF14',
+        'fucsia'=>'#FF00FF',
+        'multicolor'=>'#999999'
+    ];
 
-$colores = [];
-
-if (!empty($colores_raw) && !is_wp_error($colores_raw)) {
-    foreach ($colores_raw as $term) {
-
-        $clean_name = str_replace(['_', '-'], ' ', $term->name);
-        $term->clean_name = ucwords($clean_name);
-
-        $colores[] = $term;
-    }
-
-    usort($colores, function($a, $b) {
-        return strcmp($a->clean_name, $b->clean_name);
-    });
-}
 ?>
 
 <style>
-.fs-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 40px;
-}
+    .fs-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 0 32px
+    }
 
-.fs-archive__layout {
-    display: grid;
-    grid-template-columns: 280px 1fr;
-    gap: 40px;
-    margin-top: 40px;
-}
+    .fs-archive {
+        color: #111
+    }
 
-.fs-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 40px;
-}
+    .fs-archive * {
+        box-sizing: border-box
+    }
 
-.fs-card {
-    border: 1px solid #eee;
-    background: #fff;
-    transition: .2s ease;
-}
+    .fs-archive button {
+        all: unset;
+        cursor: pointer
+    }
 
-.fs-card:hover {
-    box-shadow: 0 8px 20px rgba(0,0,0,.08);
-}
-
-.fs-card__image {
-    padding: 20px;
-    text-align: center;
-    background: #f8f8f8;
-    min-height: 220px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.fs-card__image img {
-    max-width: 100%;
-    height: auto;
-}
-
-.fs-card__body {
-    padding: 20px;
-}
-
-.fs-card__title {
-    font-size: 16px;
-    margin-bottom: 10px;
-}
-
-.fs-card__price {
-    font-weight: bold;
-    font-size: 18px;
-    color: #7dbf00;
-}
-
-.fs-archive__sidebar h3 {
-    font-size: 18px;
-    margin-top: 25px;
-}
-
-@media (max-width: 1024px) {
+    /* Layout */
     .fs-archive__layout {
-        grid-template-columns: 1fr;
+        display: grid;
+        grid-template-columns: 260px 1fr;
+        gap: 60px
     }
+
+    @media(max-width:1024px) {
+        .fs-archive__layout {
+            display: block
+        }
+
+        .fs-archive__sidebar {
+            display: none
+        }
+    }
+
+    /* Grid */
     .fs-grid {
+        display: grid;
         grid-template-columns: repeat(2, 1fr);
+        gap: 90px 40px;
+        margin-top: 40px
     }
+
+    @media(min-width:1024px) {
+        .fs-grid {
+            grid-template-columns: repeat(4, 1fr);
+            gap: 110px 48px
+        }
+    }
+
+    .fs-card {
+        text-decoration: none;
+        color: #111
+    }
+
+    .fs-card__image {
+        background: #f6f6f6;
+        padding: 28px;
+        aspect-ratio: 1/1;
+        display: flex;
+        align-items: center;
+        justify-content: center
+    }
+
+    .fs-card__image img {
+        max-width: 75%;
+        height: auto;
+        transition: .3s
+    }
+
+    .fs-card:hover .fs-card__image img {
+        transform: scale(1.05)
+    }
+
+    .fs-card__body {
+        margin-top: 18px
+    }
+
+    .fs-card__price {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 6px
+    }
+
+    .fs-card__title {
+        font-size: 13px;
+        font-weight: 500;
+        letter-spacing: .3px
+    }
+
+    /* Filters */
+    .fs-filter {
+        border-bottom: 1px solid #e5e5e5;
+        padding: 16px 0
+    }
+
+    .fs-filter__header {
+        display: flex;
+        justify-content: space-between;
+        font-size: 14px;
+        font-weight: 600
+    }
+
+    .fs-filter__body {
+        display: none;
+        margin-top: 12px
+    }
+
+    .fs-filter.is-open .fs-filter__body {
+        display: block
+    }
+
+    .fs-filter__option {
+        display: block;
+        font-size: 13px;
+        margin-bottom: 6px
+    }
+
+    .fs-filter__submit {
+        margin-top: 20px;
+        background: #111;
+        color: #fff;
+        padding: 10px 16px;
+        font-size: 13px
+    }
+
+    /* Colors */
+    .fs-color-swatches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
 }
 
-@media (max-width: 640px) {
-    .fs-grid {
-        grid-template-columns: 1fr;
-    }
+.fs-color-swatch {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px solid #ddd;
+    position: relative;
+    cursor: pointer;
+    transition: all .2s ease;
+}
+
+.fs-color-swatch:hover {
+    transform: scale(1.1);
+    border-color: #000;
+}
+
+.fs-color-swatch.is-active {
+    border: 2px solid #000;
 }
 </style>
 
 <section class="fs-archive">
 
-    <!-- HEADER -->
-    <div class="fs-archive__header">
-        <div class="fs-container">
-
-            <nav class="fs-breadcrumb">
-                <a href="<?php echo esc_url(home_url('/')); ?>">Inicio</a>
-                <span>/</span>
-                <span>Zapatillas Fútbol Sala</span>
-            </nav>
-
-            <h2 class="fs-archive__title" style="font-size:30px;font-style: normal;font-weight: 600;letter-spacing: 1px;line-height: 1.5;">
-                <?php post_type_archive_title(); ?>
-            </h2>
-
-            <p class="fs-archive__description" style="font-size:15px;font-style: normal;font-weight: 500;line-height: 1.3;">
-                Encuentra las mejores zapatillas de fútbol sala para hombre, mujer, infantil y unisex.
-                Modelos indoor, turf y multisuperficie al mejor precio.
-            </p>
-
-        </div>
+    <div class="fs-container">
+        <h1><?php post_type_archive_title(); ?></h1>
+        <p><?php echo esc_html($total); ?> productos</p>
     </div>
 
-    <div class="fs-container fs-archive__layout">
+    <div class="fs-archive__layout fs-container">
 
-        <!-- SIDEBAR -->
         <aside class="fs-archive__sidebar">
-
             <form method="get">
 
-                <!-- GÉNERO -->
-                <h3>Género</h3>
-                <?php
-                $generos = [
-                    'hombre'   => 'Hombre',
-                    'mujer'    => 'Mujer',
-                    'unisex'   => 'Unisex',
-                    'infantil' => 'Infantil',
-                ];
-                foreach ($generos as $slug => $label) :
-                ?>
-                    <label>
-                        <input type="radio"
-                               name="genero"
-                               value="<?php echo esc_attr($slug); ?>"
-                               <?php checked($current_genero, $slug); ?>>
-                        <?php echo esc_html($label); ?>
-                    </label><br>
-                <?php endforeach; ?>
-
-                <!-- SUPERFICIE -->
-                <h3>Superficie</h3>
-                <?php foreach ($superficies as $term) : ?>
-                    <label>
-                        <input type="radio"
-                               name="superficie"
-                               value="<?php echo esc_attr($term->slug); ?>"
-                               <?php checked($current_superficie, $term->slug); ?>>
-                        <?php echo esc_html($term->name); ?>
-                    </label><br>
-                <?php endforeach; ?>
-
-                <!-- MARCA -->
-                <h3>Marca</h3>
-                <?php foreach ($brands as $brand) : ?>
-                    <label>
-                        <input type="radio"
-                               name="marca"
-                               value="<?php echo esc_attr($brand); ?>"
-                               <?php checked($current_marca, $brand); ?>>
-                        <?php echo esc_html(ucfirst($brand)); ?>
-                    </label><br>
-                <?php endforeach; ?>
-
-                <!-- COLOR -->
-                <h3>Color</h3>
-                <?php foreach ($colores as $term) : ?>
-                    <label>
-                        <input type="radio"
-                               name="color"
-                               value="<?php echo esc_attr($term->slug); ?>"
-                               <?php checked($current_color, $term->slug); ?>>
-                        <?php echo esc_html($term->clean_name); ?>
-                    </label><br>
-                <?php endforeach; ?>
-
-                <!-- PRECIO -->
-                <h3>Precio máximo (€)</h3>
-                <input type="number"
-                       name="precio_max"
-                       value="<?php echo esc_attr($current_precio_max); ?>"
-                       placeholder="Ej: 100">
-
-                <br><br>
-                <button type="submit">Filtrar</button>
-
-            </form>
-
-        </aside>
-
-        <!-- CONTENT -->
-        <main class="fs-archive__content">
-
-            <div class="fs-archive__toolbar">
-                <span><?php echo esc_html($total); ?> productos</span>
-            </div>
-
-            <?php if (!empty($product_ids)) : ?>
-
-                <div class="fs-grid">
-
-                    <?php foreach ($product_ids as $product_id) :
-
-                        $title = get_the_title($product_id);
-                        $link  = get_permalink($product_id);
-                        $image_url = $images[$product_id] ?? '';
-                        $min_price = $prices[$product_id] ?? '';
-                    ?>
-
-                        <article class="fs-card">
-                            <a href="<?php echo esc_url($link); ?>">
-
-                                <div class="fs-card__image">
-                                    <?php if ($image_url) : ?>
-                                        <img src="<?php echo esc_url($image_url); ?>"
-                                             alt="<?php echo esc_attr($title); ?>"
-                                             loading="lazy">
-                                    <?php else : ?>
-                                        <div style="width:100%;height:200px;background:#f3f3f3;"></div>
-                                    <?php endif; ?>
-                                </div>
-
-                                <div class="fs-card__body">
-                                    <h2 class="fs-card__title">
-                                        <?php echo esc_html($title); ?>
-                                    </h2>
-
-                                    <?php if ($min_price) : ?>
-                                        <div class="fs-card__price">
-                                            <?php echo number_format((float)$min_price, 2, ',', '.'); ?> €
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-
-                            </a>
-                        </article>
-
-                    <?php endforeach; ?>
-
+                <!-- Género -->
+                <div class="fs-filter">
+                    <button type="button" class="fs-filter__header">Género <span>+</span></button>
+                    <div class="fs-filter__body">
+                        <?php foreach ($generos as $slug => $label): ?>
+                            <label class="fs-filter__option">
+                                <input type="radio" name="genero" value="<?php echo esc_attr(
+                                    $slug
+                                ); ?>" <?php checked(
+    $current_genero,
+    $slug
+); ?>>
+                                <?php echo esc_html($label); ?>
+                            </label>
+                        <?php endforeach; ?>
+                    </div>
                 </div>
 
-                <?php
-                $total_pages = ceil($total / $per_page);
-                if ($total_pages > 1) :
-                    echo '<div class="fs-pagination">';
-                    echo paginate_links([
-                        'total'   => $total_pages,
-                        'current' => $paged,
-                    ]);
-                    echo '</div>';
-                endif;
-                ?>
+                <!-- Superficie -->
+                <div class="fs-filter">
+                    <button type="button" class="fs-filter__header">Superficie <span>+</span></button>
+                    <div class="fs-filter__body">
+                        <?php foreach ($superficies as $term): ?>
+                            <label class="fs-filter__option">
+                                <input type="radio" name="superficie" value="<?php echo esc_attr(
+                                    $term->slug
+                                ); ?>" <?php checked(
+    $current_superficie,
+    $term->slug
+); ?>>
+                                <?php echo esc_html($term->name); ?>
+                            </label>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
 
-            <?php else : ?>
-                <p>No se encontraron productos con los filtros seleccionados.</p>
+                <!-- Marca -->
+                <div class="fs-filter">
+                    <button type="button" class="fs-filter__header">Marca <span>+</span></button>
+                    <div class="fs-filter__body">
+                        <?php foreach ($brands as $brand): ?>
+                            <label class="fs-filter__option">
+                                <input type="radio" name="marca" value="<?php echo esc_attr(
+                                    $brand->slug
+                                ); ?>" <?php checked(
+    $current_marca,
+    $brand->slug
+); ?>>
+                                <?php echo esc_html($brand->name); ?>
+                            </label>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+
+                <!-- Color -->
+                <div class="fs-filter">
+                    <button type="button" class="fs-filter__header">Color <span>+</span></button>
+                    <?php $colores = get_terms([
+                        'taxonomy'   => 'fs_color',
+                        'hide_empty' => false,
+                    ]);
+                    
+                    if (!empty($colores) && !is_wp_error($colores)) :
+                    
+                        echo '<div class="fs-color-swatches">';
+                    
+                        foreach ($colores as $term) :
+                    
+                            $slug = $term->slug;
+                            $active = ($current_color === $slug) ? 'is-active' : '';
+                    
+                            echo '<a href="' . esc_url(add_query_arg('color', $slug)) . '" 
+                                     class="fs-color-swatch ' . esc_attr($active) . '" 
+                                     title="' . esc_attr($term->name) . '"
+                                     data-color="' . esc_attr($slug) . '">
+                                  </a>';
+                    
+                        endforeach;
+                    
+                        echo '</div>';
+                    
+                    endif; ?>
+                </div>
+
+                <!-- Precio -->
+                <div class="fs-filter">
+                    <button type="button" class="fs-filter__header">Precio máximo (€) <span>+</span></button>
+                    <div class="fs-filter__body">
+                        <input type="number" name="precio_max" value="<?php echo esc_attr(
+                            $current_precio_max
+                        ); ?>">
+                    </div>
+                </div>
+
+                <button type="submit" class="fs-filter__submit">Aplicar filtros</button>
+
+            </form>
+        </aside>
+
+        <main>
+
+            <?php if (!empty($product_ids)): ?>
+                <div class="fs-grid">
+                    <?php foreach ($product_ids as $product_id):
+
+                        $title = get_the_title($product_id);
+                        $link = get_permalink($product_id);
+                        $image = $images[$product_id] ?? "";
+                        $price = $prices[$product_id] ?? "";
+                        ?>
+                        <article class="fs-card">
+                            <a href="<?php echo esc_url($link); ?>">
+                                <div class="fs-card__image">
+                                    <?php if ($image): ?>
+                                        <img src="<?php echo esc_url(
+                                            $image
+                                        ); ?>" alt="<?php echo esc_attr(
+    $title
+); ?>">
+                                    <?php endif; ?>
+                                </div>
+                                <div class="fs-card__body">
+                                    <?php if ($price): ?>
+                                        <div class="fs-card__price">€ <?php echo number_format(
+                                            (float) $price,
+                                            0,
+                                            ",",
+                                            "."
+                                        ); ?></div>
+                                    <?php endif; ?>
+                                    <div class="fs-card__title"><?php echo esc_html(
+                                        $title
+                                    ); ?></div>
+                                </div>
+                            </a>
+                        </article>
+                    <?php
+                    endforeach; ?>
+                </div>
+            <?php else: ?>
+                <p>No se encontraron productos.</p>
             <?php endif; ?>
 
         </main>
-
     </div>
-
 </section>
 
-<?php get_footer(); ?>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+
+        document.querySelectorAll('.fs-filter__header').forEach(btn => {
+            btn.addEventListener('click', () => btn.parentElement.classList.toggle('is-open'));
+        });
+
+    });
+    
+    const COLOR_MAP = {
+        negro:'#000000',
+        blanco:'#FFFFFF',
+        blanco_coral:'#F2ECDF',
+        rojo:'#FF0000',
+        azul:'#0000FF',
+        azul_marino:'#000080',
+        azul_claro:'#90D5FF',
+        azul_fucsia:'#6A00FF',
+        azul_royal:'#4169E1',
+        verde:'#008000',
+        verde_fluor:'#39FF14',
+        amarillo:'#FFFF00',
+        amarillo_fluor:'#CCFF00',
+        naranja:'#FFA500',
+        gris:'#808080',
+        gris_claro:'#CDCDCD',
+        rosa:'#FFC0CB',
+        morado:'#800080',
+        turquesa:'#40E0D0',
+        oro:'#FFD700',
+        plata:'#C0C0C0',
+        beige:'#F5F5DC',
+        marron:'#8B4513',
+        marrón:'#8B4513',
+        cuero:'#AC7434',
+        lima:'#99FF33',
+        royal:'#4169E1',
+        marino:'#000080',
+        bordeaux:'#800000',
+        neon:'#39FF14',
+        fucsia:'#FF00FF',
+        multicolor:'#999999'
+    };
+    
+    document.querySelectorAll('.fs-color-swatch').forEach(el => {
+
+    const slug = el.dataset.color;
+    if (!slug) return;
+
+    const parts = slug.split(/[-_]/);
+
+    if (parts.length === 1) {
+
+        const color = COLOR_MAP[parts[0]] || '#ccc';
+        el.style.background = color;
+
+    } else {
+
+        const color1 = COLOR_MAP[parts[0]] || '#ccc';
+        const color2 = COLOR_MAP[parts[1]] || '#ccc';
+
+        el.style.background = `linear-gradient(135deg, ${color1} 50%, ${color2} 50%)`;
+    }
+});
+</script>
+<?php
+get_footer();
