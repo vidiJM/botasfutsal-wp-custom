@@ -43,7 +43,7 @@ final class SprinterOfferImporter
         }
 
         $size = trim((string) ($data['size'] ?? ''));
-        $size = $size !== '' ? $size : 'UNICA';
+        //$size = $size !== '' ? $size : 'UNICA';
 
         // ============================
         // OFFER_ID ÚNICO
