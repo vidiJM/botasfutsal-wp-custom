@@ -68,6 +68,17 @@ $tallas = get_terms([
     "hide_empty"=>false,
 ]);
 
+function fs_render_active_pill($param, $label) {
+    ?>
+    <div class="fs-active-single">
+        <a href="<?php echo esc_url(remove_query_arg($param)); ?>"
+           class="fs-chip">
+            <?php echo esc_html($label); ?>
+            <span aria-hidden="true">×</span>
+        </a>
+    </div>
+    <?php
+}
 ?>
 
 <style>
@@ -200,12 +211,15 @@ $tallas = get_terms([
 }
 
 .fs-filter__body{
-  display:none;
-  margin-top:12px;
+    font-weight: 600;
+    display: none;
+    margin-top:1rem;
 }
 
-.fs-filter.is-open .fs-filter__body{
-  display:block;
+.fs-filter.is-open .fs-filter__body {
+  display: flex;        /* o block si no necesitas flex */
+  flex-wrap: wrap;      /* si quieres layout horizontal */
+  gap: 12px;            /* opcional */
 }
 
 .fs-filter__option{
@@ -372,288 +386,377 @@ $tallas = get_terms([
 <section class="fs-archive">
 
     <div class="fs-container">
-        <h1><?php post_type_archive_title(); ?></h1>
+        <h1>Zapatillas de Fútbol Sala</h1>
+        <p>Busca la zapatilla que deseas.</p>
     </div>
 
     <div class="fs-archive__layout fs-container">
 
         <aside class="fs-archive__sidebar">
             <p><?php echo esc_html($total); ?> productos</p>
+
             <form method="get">
 
-                <!-- Género -->
-                <div class="fs-filter">
+                <!-- =========================
+                     GÉNERO
+                ========================== -->
+                <div class="fs-filter <?php echo $current_genero ? 'is-active' : ''; ?>">
+
                     <button type="button" class="fs-filter__header">Género</button>
-                    <div class="fs-filter__body">
-                        <?php foreach ($generos as $slug => $label): ?>
 
-                            <?php
-                            if (!empty($available['genero']) && !in_array($slug, $available['genero']) && $current_genero !== $slug) {
-                                continue;
-                            }
-                            ?>
-                        
-                            <label class="fs-filter__option">
-                                <input type="radio" name="genero"
-                                       value="<?php echo esc_attr($slug); ?>"
-                                       <?php checked($current_genero,$slug); ?>>
-                                <?php echo esc_html($label); ?>
-                            </label>
-                        
-                        <?php endforeach; ?>
-                    </div>
-                </div>
+                    <?php if ($current_genero): ?>
 
-                <!-- Superficie -->
-                <div class="fs-filter">
-                    <button type="button" class="fs-filter__header">Superficie</button>
-                    <div class="fs-filter__body">
-                        <?php foreach ($superficies as $term): ?>
+                        <input type="hidden"
+                               name="genero"
+                               value="<?php echo esc_attr($current_genero); ?>">
 
-                            <?php
-                            if (!empty($available['superficie']) && !in_array($term->slug,$available['superficie']) && $current_superficie !== $term->slug) {
-                                continue;
-                            }
-                            ?>
-                        
-                            <label class="fs-filter__option">
-                                <input type="radio" name="superficie"
-                                       value="<?php echo esc_attr($term->slug); ?>"
-                                       <?php checked($current_superficie,$term->slug); ?>>
-                                <?php echo esc_html($term->name); ?>
-                            </label>
-                        
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-
-                <!-- Marca -->
-                <div class="fs-filter">
-                    <button type="button" class="fs-filter__header">Marca</button>
-                    <div class="fs-filter__body">
-                        <?php foreach ($brands as $brand): ?>
-
-                            <?php
-                            if (!empty($available['marca']) && !in_array($brand->slug,$available['marca']) && $current_marca !== $brand->slug) {
-                                continue;
-                            }
-                        
-                            $label = ucwords(mb_strtolower(str_replace('-',' ',$brand->name),'UTF-8'));
-                            ?>
-                        
-                            <label class="fs-filter__option">
-                                <input type="radio" name="marca"
-                                       value="<?php echo esc_attr($brand->slug); ?>"
-                                       <?php checked($current_marca,$brand->slug); ?>>
-                                <?php echo esc_html($label); ?>
-                            </label>
-                        
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-
-                <!-- Color -->
-                <div class="fs-filter">
-                    <button type="button" class="fs-filter__header">Color</button>
-                    <div class="fs-filter__body">
                         <?php
-                        $colores = get_terms([
-                            'taxonomy'   => 'fs_color',
-                            'hide_empty' => false,
-                            'orderby'    => 'name',
-                            'order'      => 'ASC',
-                        ]);
+                        $label = $generos[$current_genero] ?? $current_genero;
+                        fs_render_active_pill('genero', $label);
+                        ?>
 
-                        if (!empty($colores) && !is_wp_error($colores)) :
-                            echo '<div class="fs-color-swatches">';
+                    <?php else: ?>
 
-                            $colores = get_terms([
-                                'taxonomy'=>'fs_color',
-                                'hide_empty'=>false,
-                            ]);
-                            ?>
-                            
-                            <div class="fs-color-swatches">
-                            <?php foreach ($colores as $term): ?>
-                            
+                        <div class="fs-filter__body">
+                            <?php foreach ($generos as $slug => $label): ?>
+
                                 <?php
-                                if (!empty($available['color']) && !in_array($term->slug,$available['color']) && $current_color !== $term->slug) {
+                                if (!empty($available['genero']) &&
+                                    !in_array($slug, $available['genero'])) {
                                     continue;
                                 }
                                 ?>
-                            
-                                <label class="fs-color-choice">
-                                    <input type="radio" name="color"
-                                           class="fs-color-input"
-                                           value="<?php echo esc_attr($term->slug); ?>"
-                                           <?php checked($current_color,$term->slug); ?>>
-                                    <span class="fs-color-swatch"></span>
+
+                                <label class="fs-filter__option">
+                                    <input type="radio"
+                                           name="genero"
+                                           value="<?php echo esc_attr($slug); ?>">
+                                    <?php echo esc_html($label); ?>
                                 </label>
-                            
-                            <?php endforeach; 
-                            echo '</div>';
-                            echo '</div>';
-                        endif;
-                        ?>
-                    </div>
+
+                            <?php endforeach; ?>
+                        </div>
+
+                    <?php endif; ?>
+
                 </div>
 
-                <!-- Talla -->
-                <div class="fs-filter">
-                    <button type="button" class="fs-filter__header">Talla (EU)</button>
-                    <div class="fs-filter__body">
-                        <?php foreach ($tallas as $term): ?>
+                <!-- =========================
+                     SUPERFICIE
+                ========================== -->
+                <div class="fs-filter <?php echo $current_superficie ? 'is-active' : ''; ?>">
+
+                    <button type="button" class="fs-filter__header">Superficies</button>
+
+                    <?php if ($current_superficie): ?>
+
+                        <input type="hidden"
+                               name="superficie"
+                               value="<?php echo esc_attr($current_superficie); ?>">
+
+                        <?php
+                        $term = get_term_by('slug', $current_superficie, 'fs_superficie');
+                        $label = $term ? $term->name : $current_superficie;
+                        fs_render_active_pill('superficie', $label);
+                        ?>
+
+                    <?php else: ?>
+
+                        <div class="fs-filter__body">
+                            <?php foreach ($superficies as $term): ?>
+
+                                <?php
+                                if (!empty($available['superficie']) &&
+                                    !in_array($term->slug, $available['superficie'])) {
+                                    continue;
+                                }
+                                ?>
+
+                                <label class="fs-filter__option">
+                                    <input type="radio"
+                                           name="superficie"
+                                           value="<?php echo esc_attr($term->slug); ?>">
+                                    <?php echo esc_html($term->name); ?>
+                                </label>
+
+                            <?php endforeach; ?>
+                        </div>
+
+                    <?php endif; ?>
+
+                </div>
+
+                <!-- =========================
+                     MARCA
+                ========================== -->
+                <div class="fs-filter <?php echo $current_marca ? 'is-active' : ''; ?>">
+
+                    <button type="button" class="fs-filter__header">Marcas</button>
+
+                    <?php if ($current_marca): ?>
+
+                        <input type="hidden"
+                               name="marca"
+                               value="<?php echo esc_attr($current_marca); ?>">
+
+                        <?php
+                        $brand_label = $current_marca;
+
+                        foreach ($brands as $b) {
+                            if ($b->slug === $current_marca) {
+                                $brand_label = ucwords(
+                                    mb_strtolower(str_replace('-', ' ', $b->name),'UTF-8')
+                                );
+                                break;
+                            }
+                        }
+
+                        fs_render_active_pill('marca', $brand_label);
+                        ?>
+
+                    <?php else: ?>
+
+                        <div class="fs-filter__body">
+                            <?php foreach ($brands as $brand): ?>
+
+                                <?php
+                                if (!empty($available['marca']) &&
+                                    !in_array($brand->slug, $available['marca'])) {
+                                    continue;
+                                }
+                                ?>
+
+                                <label class="fs-filter__option">
+                                    <input type="radio"
+                                           name="marca"
+                                           value="<?php echo esc_attr($brand->slug); ?>">
+                                    <?php echo esc_html($brand->name); ?>
+                                </label>
+
+                            <?php endforeach; ?>
+                        </div>
+
+                    <?php endif; ?>
+
+                </div>
+
+                <!-- =========================
+                     COLOR
+                ========================== -->
+                <div class="fs-filter <?php echo $current_color ? 'is-active' : ''; ?>">
+
+                    <button type="button" class="fs-filter__header">Colores</button>
+
+                    <?php if ($current_color): ?>
+
+                        <input type="hidden"
+                               name="color"
+                               value="<?php echo esc_attr($current_color); ?>">
+
+                        <?php
+                        $term = get_term_by('slug', $current_color, 'fs_color');
+                        $label = $term ? $term->name : $current_color;
+                        fs_render_active_pill('color', $label);
+                        ?>
+
+                    <?php else: ?>
+
+                        <div class="fs-filter__body">
 
                             <?php
-                            if (!empty($available['talla']) && !in_array($term->slug,$available['talla']) && $current_talla !== $term->slug) {
-                                continue;
-                            }
+                            $colores = get_terms([
+                                'taxonomy'   => 'fs_color',
+                                'hide_empty' => false,
+                                'orderby'    => 'name',
+                                'order'      => 'ASC',
+                            ]);
                             ?>
-                        
-                            <label class="fs-filter__option">
-                                <input type="radio" name="talla"
-                                       value="<?php echo esc_attr($term->slug); ?>"
-                                       <?php checked($current_talla,$term->slug); ?>>
-                                <?php echo esc_html($term->name); ?>
-                            </label>
-                        
-                        <?php endforeach; ?>
-                    </div>
+
+                            <?php if (!empty($colores) && !is_wp_error($colores)) : ?>
+
+                                <div class="fs-color-swatches">
+
+                                    <?php foreach ($colores as $term): ?>
+
+                                        <?php
+                                        if (!empty($available['color']) &&
+                                            !in_array($term->slug, $available['color'])) {
+                                            continue;
+                                        }
+                                        ?>
+
+                                        <label class="fs-color-choice">
+                                            <input type="radio"
+                                                   name="color"
+                                                   class="fs-color-input"
+                                                   value="<?php echo esc_attr($term->slug); ?>">
+                                            <span class="fs-color-swatch"></span>
+                                        </label>
+
+                                    <?php endforeach; ?>
+
+                                </div>
+
+                            <?php endif; ?>
+
+                        </div>
+
+                    <?php endif; ?>
+
                 </div>
 
-                <!-- Precio -->
-                <div class="fs-filter">
-                    <button type="button" class="fs-filter__header">Precio máximo (€)</button>
-                    <div class="fs-filter__body">
-                        <?php $max_price_available_int = 0;
-                            if (!empty($prices)) {
-                                $max_price_available_int = (int) ceil(max(array_map('floatval', $prices)));
-                            } ?>
+                <!-- =========================
+                     TALLA
+                ========================== -->
+                <div class="fs-filter <?php echo $current_talla ? 'is-active' : ''; ?>">
 
-                        <div class="fs-price">
+                    <button type="button" class="fs-filter__header">Tallas (EU)</button>
+
+                    <?php if ($current_talla): ?>
+
+                        <input type="hidden"
+                               name="talla"
+                               value="<?php echo esc_attr($current_talla); ?>">
+
+                        <?php
+                        $term = get_term_by('slug', $current_talla, 'fs_talla_eu');
+                        $label = $term ? $term->name : $current_talla;
+                        fs_render_active_pill('talla', $label);
+                        ?>
+
+                    <?php else: ?>
+
+                        <div class="fs-filter__body">
+                            <?php foreach ($tallas as $term): ?>
+
+                                <?php
+                                if (!empty($available['talla']) &&
+                                    !in_array($term->slug, $available['talla'])) {
+                                    continue;
+                                }
+                                ?>
+
+                                <label class="fs-filter__option">
+                                    <input type="radio"
+                                           name="talla"
+                                           value="<?php echo esc_attr($term->slug); ?>">
+                                    <?php echo esc_html($term->name); ?>
+                                </label>
+
+                            <?php endforeach; ?>
+                        </div>
+
+                    <?php endif; ?>
+
+                </div>
+
+                <!-- =========================
+                     PRECIO
+                ========================== -->
+                <div class="fs-filter <?php echo $current_precio_max > 0 ? 'is-active' : ''; ?>">
+
+                    <button type="button" class="fs-filter__header">Precio máximo (€)</button>
+
+                    <?php if ($current_precio_max > 0): ?>
+
+                        <input type="hidden"
+                               name="precio_max"
+                               value="<?php echo esc_attr($current_precio_max); ?>">
+
+                        <?php
+                        $label = 'Hasta ' . (int)$current_precio_max . '€';
+                        fs_render_active_pill('precio_max', $label);
+                        ?>
+
+                    <?php else: ?>
+
+                        <div class="fs-filter__body">
+
+                            <?php
+                            $max_price_available = 0;
+
+                            if (!empty($prices)) {
+                                $max_price_available = (int) ceil(max(array_map('floatval', $prices)));
+                            }
+                            ?>
+
                             <input
                                 type="number"
                                 name="precio_max"
                                 min="0"
-                                max="<?php echo esc_attr($max_price_available_int); ?>"
+                                max="<?php echo esc_attr($max_price_available); ?>"
                                 step="1"
-                                value="<?php echo esc_attr((int) $current_precio_max); ?>"
+                                value=""
                                 class="fs-price__input"
                             >
 
-                            <?php if ($max_price_available_int > 0): ?>
+                            <?php if ($max_price_available > 0): ?>
                                 <div class="fs-price__hint">
-                                    Máximo disponible con estos filtros: <strong><?php echo esc_html($max_price_available_int); ?>€</strong>
+                                    Máximo disponible:
+                                    <strong><?php echo esc_html($max_price_available); ?>€</strong>
                                 </div>
                             <?php endif; ?>
 
-                            <?php if ($max_price_available_int > 0 && (float) $current_precio_max > 0 && (float) $current_precio_max > (float) $max_price_available_int): ?>
-                                <div class="fs-price__warn">
-                                    Tu precio máximo supera el máximo disponible. Ajusta a <?php echo esc_html($max_price_available_int); ?>€.
-                                </div>
-                            <?php endif; ?>
                         </div>
-                    </div>
+
+                    <?php endif; ?>
+
                 </div>
 
-                <!-- <button type="submit" class="fs-filter__submit">Aplicar filtros</button> -->
             </form>
         </aside>
 
         <main>
 
-            <?php
-            // Chips activos (labels human-friendly)
-            $active_filters = [];
-
-            if ($current_genero !== '') {
-                $active_filters['genero'] = $generos[$current_genero] ?? $current_genero;
-            }
-
-            if ($current_superficie !== '') {
-                $surface_label = $current_superficie;
-                foreach ($superficies as $s) {
-                    if ((string) $s->slug === $current_superficie) {
-                        $surface_label = (string) $s->name;
-                        break;
-                    }
-                }
-                $active_filters['superficie'] = $surface_label;
-            }
-
-            if ($current_marca !== '') {
-                $brand_label = $current_marca;
-                foreach ($brands as $b) {
-                    if ((string) $b->slug === $current_marca) {
-                        $brand_label = (string) $b->name;
-                        break;
-                    }
-                }
-                $active_filters['marca'] = $brand_label;
-            }
-
-            if ($current_color !== '') {
-                $color_term = get_term_by('slug', $current_color, 'fs_color');
-                $active_filters['color'] = ($color_term && !is_wp_error($color_term)) ? $color_term->name : $current_color;
-            }
-
-            if ($current_talla !== '') {
-                $talla_term = get_term_by('slug', $current_talla, 'fs_talla_eu');
-                $active_filters['talla'] = ($talla_term && !is_wp_error($talla_term)) ? $talla_term->name : $current_talla;
-            }
-
-            if ((float) $current_precio_max > 0) {
-                $active_filters['precio_max'] = 'Hasta ' . (int) $current_precio_max . '€';
-            }
-            ?>
-
-            <?php if (!empty($active_filters)) : ?>
-                <div class="fs-active-filters">
-                    <?php foreach ($active_filters as $key => $label): ?>
-                        <a href="<?php echo esc_url(remove_query_arg($key)); ?>" class="fs-chip">
-                            <?php echo esc_html($label); ?>
-                            <span aria-hidden="true">×</span>
-                        </a>
-                    <?php endforeach; ?>
-
-                    <a href="<?php echo esc_url(get_post_type_archive_link('fs_producto')); ?>" class="fs-chip fs-chip--clear">
-                        Limpiar todo
-                    </a>
-                </div>
-            <?php endif; ?>
-
             <?php if (!empty($product_ids)): ?>
+
                 <div class="fs-grid">
+
                     <?php foreach ($product_ids as $product_id):
+
                         $title = get_the_title($product_id);
                         $link  = get_permalink($product_id);
                         $image = $images[$product_id] ?? '';
                         $price = $prices[$product_id] ?? '';
-                        ?>
+                    ?>
+
                         <article class="fs-card">
                             <a href="<?php echo esc_url($link); ?>">
                                 <div class="fs-card__image">
                                     <?php if ($image): ?>
-                                        <img src="<?php echo esc_url($image); ?>" alt="<?php echo esc_attr($title); ?>">
+                                        <img src="<?php echo esc_url($image); ?>"
+                                             alt="<?php echo esc_attr($title); ?>">
                                     <?php endif; ?>
                                 </div>
+
                                 <div class="fs-card__body">
                                     <?php if ($price): ?>
-                                        <div class="fs-card__price">€ <?php echo number_format((float) $price, 0, ",", "."); ?></div>
+                                        <div class="fs-card__price">
+                                            € <?php echo number_format((float)$price, 0, ",", "."); ?>
+                                        </div>
                                     <?php endif; ?>
-                                    <div class="fs-card__title"><?php echo esc_html($title); ?></div>
+
+                                    <div class="fs-card__title">
+                                        <?php echo esc_html($title); ?>
+                                    </div>
                                 </div>
                             </a>
                         </article>
+
                     <?php endforeach; ?>
+
                 </div>
+
             <?php else: ?>
+
                 <p>No se encontraron productos.</p>
+
             <?php endif; ?>
 
         </main>
 
     </div>
+
 </section>
 
 <script>
@@ -664,25 +767,25 @@ document.addEventListener('DOMContentLoaded', function () {
     ========================================== */
     
     document.querySelectorAll('.fs-filter__header').forEach(btn => {
+
+      btn.addEventListener('click', function () {
     
-    btn.addEventListener('click', function () {
+        const filter = this.closest('.fs-filter');
+        if (!filter) return;
     
-      const filter = this.closest('.fs-filter');
-      if (!filter) return;
+        const isOpen = filter.classList.contains('is-open');
     
-      const isOpen = filter.classList.contains('is-open');
+        // cerrar todos
+        document.querySelectorAll('.fs-filter').forEach(f => {
+          f.classList.remove('is-open');
+        });
     
-      // cerrar todos primero (opcional, más limpio UX)
-      document.querySelectorAll('.fs-filter').forEach(f => {
-        f.classList.remove('is-open');
+        // abrir solo si estaba cerrado
+        if (!isOpen) {
+          filter.classList.add('is-open');
+        }
+    
       });
-    
-      // abrir si estaba cerrado
-      if (!isOpen) {
-        filter.classList.add('is-open');
-      }
-    
-    });
     
     });
 
