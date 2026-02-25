@@ -23,6 +23,7 @@ use FS\ShortcodeSuite\Shortcodes\Product_Detail;
 use FS\ShortcodeSuite\REST\Grid_Controller;
 use FS\ShortcodeSuite\REST\Search_Controller;
 use FS\ShortcodeSuite\REST\Selector_Wizard_Controller;
+use FS\ShortcodeSuite\REST\Product_Controller;
 
 defined('ABSPATH') || exit;
 
@@ -41,6 +42,9 @@ final class Loader
         // Shortcodes “sueltos”
         $this->boot_misc_shortcodes();
 
+        // Products AJAX
+        $this->boot_product_ajax();
+        
         // Admin
         $this->boot_admin();
     }
@@ -53,15 +57,21 @@ final class Loader
         $repository = new Product_Repository();
         $builder    = new Grid_Dataset_Builder($repository);
         $cache      = new Cache_Manager();
-
+    
         $service = new Grid_Service($repository, $builder, $cache);
-
-        // Shortcode [fs_grid]
+    
+        // Shortcode
         new Product_Grid($service);
-
-        // REST /fs/v1/grid
+    
+        // REST Grid (si ya existe)
         add_action('rest_api_init', static function () use ($service): void {
             $controller = new Grid_Controller($service);
+            $controller->register_routes();
+        });
+    
+        // 👉 REST Products (nuevo)
+        add_action('rest_api_init', static function (): void {
+            $controller = new \FS\ShortcodeSuite\REST\Product_Controller();
             $controller->register_routes();
         });
     }
@@ -118,6 +128,13 @@ final class Loader
         $admin->init();
     }
 
+    private function boot_product_ajax(): void
+    {
+        add_action('rest_api_init', function (): void {
+            $controller = new Product_Controller();
+            $controller->register_routes();
+        });
+    }
     /**
      * Compatibilidad: algunas clases usan register(), otras registran en __construct.
      * Si existe register() lo llamamos.
