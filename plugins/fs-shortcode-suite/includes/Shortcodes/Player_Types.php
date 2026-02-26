@@ -40,19 +40,19 @@ final class Player_Types
                     <?php
                     echo $this->card(
                         496413,
-                        home_url('/zapatillas/velocidad/'));
+                        home_url('/fs_caracteristica/resistencia/'));
 
                     echo $this->card(
                         496417,
-                        home_url('/zapatillas/control/'));
+                        home_url('/fs_caracteristica/calidad-precio/'));
 
                     echo $this->card(
                         496411,
-                        home_url('/zapatillas/resistencia/'));
+                        home_url('/fs_caracteristica/velocidad/'));
 
                     echo $this->card(
                         496412,
-                        home_url('/zapatillas/calidad-precio/'));
+                        home_url('/fs_caracteristica/control/'));
                     ?>
 
                 </div>
