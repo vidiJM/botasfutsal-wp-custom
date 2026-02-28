@@ -248,7 +248,6 @@
 ========================================================== */
 
 .fs-filter-options button {
-    width: 45%;
     text-align: center;
 
     padding: 10px 12px;
@@ -404,11 +403,13 @@
 
 /* DOT */
 .fs-color-dot {
-    width: 14%!important;
-    border-radius: 4px;
+    width: 1em!important;
+    height: 1em!important;
+    border-radius: 50%;
     cursor: pointer;
     transition: all .2s ease;
     padding: 0;
+    border: 1px solid #fff;
 }
 
 /* Hover */
@@ -798,4 +799,79 @@
 .fs-search-more:hover {
     background: #111;
     color: #fff;
+}
+.fs-product-card__colors {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.fs-color-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1px solid #ddd;
+}
+
+.fs-product-card__sizes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.fs-size {
+    font-size: 12px;
+    padding: 2px 6px;
+    border: 1px solid #eee;
+    border-radius: 4px;
+}
+
+.fs-size-more {
+    font-size: 12px;
+    opacity: .6;
+}
+.fs-product-card__meta {
+    margin-top: 6px;
+    font-size: 13px;
+    color: #666;
+    display: flex;
+    gap: 10px;
+}
+
+.fs-product-card__meta span {
+    position: relative;
+}
+
+.fs-product-card__meta span:not(:last-child)::after {
+    content: "•";
+    margin-left: 10px;
+    color: #bbb;
+}
+.fs-filter-pill {
+    background: #78be20;
+    color: #fff;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.fs-filter-pill__remove {
+    font-weight: bold;
+    cursor: pointer;
+}
+.fs-filter-option.active {
+    background: #78be20;
+    color: #fff;
+}
+
+.fs-filter-option .fs-remove {
+    margin-left: 6px;
+    font-weight: bold;
+    cursor: pointer;
 }

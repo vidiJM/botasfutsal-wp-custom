@@ -80,7 +80,66 @@ final class Product_Detail
             <div class="fs-product-detail__description"></div>
 
         </section>
-
+        
+    <?php
+        // ===============================
+        // SCHEMA PRODUCT (AggregateOffer)
+        // ===============================
+        
+        $min_price = null;
+        $max_price = null;
+        $offer_count = 0;
+        $images = [];
+        
+        if (!empty($data['colors'])) {
+        
+            foreach ($data['colors'] as $color => $color_data) {
+        
+                if (!empty($color_data['price'])) {
+        
+                    $price = (float) $color_data['price'];
+        
+                    if ($min_price === null || $price < $min_price) {
+                        $min_price = $price;
+                    }
+        
+                    if ($max_price === null || $price > $max_price) {
+                        $max_price = $price;
+                    }
+        
+                    $offer_count++;
+                }
+        
+                if (!empty($color_data['images'][0])) {
+                    $images[] = $color_data['images'][0];
+                }
+            }
+        }
+        
+        if ($min_price !== null) {
+        
+            $schema = [
+                "@context" => "https://schema.org",
+                "@type"    => "Product",
+                "name"     => get_the_title($product_id),
+                "url"      => get_permalink($product_id),
+                "image"    => array_values(array_unique($images)),
+                "offers"   => [
+                    "@type"         => "AggregateOffer",
+                    "priceCurrency" => "EUR",
+                    "lowPrice"      => number_format($min_price, 2, '.', ''),
+                    "highPrice"     => number_format($max_price, 2, '.', ''),
+                    "offerCount"    => $offer_count,
+                    "availability"  => "https://schema.org/InStock"
+                ]
+            ];
+        
+            echo '<script type="application/ld+json">';
+            echo wp_json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            echo '</script>';
+        }
+        ?>
+        
         <?php
         return (string) ob_get_clean();
     }
@@ -88,11 +147,33 @@ final class Product_Detail
     private function build_product_data(int $product_id): array
     {
         $product_code = get_field('fs_product_id', $product_id);
-
+    
         if (!$product_code) {
             return [];
         }
-
+    
+        /*
+         * =========================================
+         * 0️⃣ MARCA (tax fs_marca en fs_producto)
+         * =========================================
+         */
+    
+        $brand_slug = null;
+        $brand_name = null;
+    
+        $brand_terms = wp_get_post_terms($product_id, 'fs_marca');
+    
+        if (!empty($brand_terms) && !is_wp_error($brand_terms)) {
+            $brand_slug = $brand_terms[0]->slug;
+            $brand_name = $brand_terms[0]->name;
+        }
+    
+        /*
+         * =========================================
+         * 1️⃣ VARIANTES
+         * =========================================
+         */
+    
         $variants_query = new WP_Query([
             'post_type'      => 'fs_variante',
             'posts_per_page' => -1,
@@ -101,24 +182,30 @@ final class Product_Detail
             'fields'         => 'ids',
             'no_found_rows'  => true,
         ]);
-
+    
         if (empty($variants_query->posts)) {
             return [];
         }
-
+    
         $variant_map = [];
-
+    
         foreach ($variants_query->posts as $variant_post_id) {
             $external_variant_id = get_field('fs_variant_id', $variant_post_id);
             if ($external_variant_id) {
                 $variant_map[$external_variant_id] = $variant_post_id;
             }
         }
-
+    
         if (empty($variant_map)) {
             return [];
         }
-
+    
+        /*
+         * =========================================
+         * 2️⃣ OFERTAS CON STOCK
+         * =========================================
+         */
+    
         $offers_query = new WP_Query([
             'post_type'      => 'fs_oferta',
             'posts_per_page' => -1,
@@ -136,33 +223,33 @@ final class Product_Detail
             'fields'        => 'ids',
             'no_found_rows' => true,
         ]);
-
+    
         $colors = [];
-
+    
         foreach ($offers_query->posts as $offer_id) {
-
+    
             $variant_external_id = get_field('fs_variant_id', $offer_id);
-
+    
             if (!isset($variant_map[$variant_external_id])) {
                 continue;
             }
-
+    
             $variant_post_id = $variant_map[$variant_external_id];
-
+    
             $color_terms = wp_get_post_terms($variant_post_id, 'fs_color');
             if (empty($color_terms)) {
                 continue;
             }
-
+    
             $color_slug = $color_terms[0]->slug;
-
+    
             if (!isset($colors[$color_slug])) {
-
+    
                 $variant_description = get_field('fs_description_raw', $variant_post_id);
                 if (!$variant_description) {
                     $variant_description = get_field('fs_description_raw', $product_id);
                 }
-
+    
                 $colors[$color_slug] = [
                     'images'      => [],
                     'sizes'       => [],
@@ -171,12 +258,12 @@ final class Product_Detail
                     'description' => $this->sanitize_description($variant_description),
                 ];
             }
-
+    
             $images_raw = (string) get_field('fs_images', $variant_post_id);
-
+    
             if ($images_raw !== '') {
                 $parts = preg_split('/[\r\n,]+/', $images_raw);
-
+    
                 foreach ($parts as $url) {
                     $url = trim($url);
                     if ($url !== '' && filter_var($url, FILTER_VALIDATE_URL)) {
@@ -184,15 +271,15 @@ final class Product_Detail
                     }
                 }
             }
-
+    
             $size  = get_field('fs_size_eu', $offer_id);
             $price = (float) get_field('fs_price', $offer_id);
             $url   = get_field('fs_url', $offer_id);
-
+    
             if ($size) {
                 $colors[$color_slug]['sizes'][] = $size;
             }
-
+    
             if (
                 is_null($colors[$color_slug]['price']) ||
                 $price < $colors[$color_slug]['price']
@@ -201,13 +288,17 @@ final class Product_Detail
                 $colors[$color_slug]['shop_url'] = $url;
             }
         }
-
+    
         foreach ($colors as $slug => $data) {
             $colors[$slug]['images'] = array_values(array_unique($data['images']));
             $colors[$slug]['sizes']  = array_values(array_unique($data['sizes']));
         }
-
-        return ['colors' => $colors];
+    
+        return [
+            'brand_slug' => $brand_slug,
+            'brand_name' => $brand_name,
+            'colors'     => $colors,
+        ];
     }
 
     /**

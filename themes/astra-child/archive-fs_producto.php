@@ -98,349 +98,384 @@ if (!is_array($tallas) || is_wp_error($tallas)) {
 ?>
 
 <style>
-    /* ================================
+
+/* ================================
    BASE LAYOUT
 ================================ */
 
-    .fs-container {
-        max-width: 1400px;
-        margin: 0 auto;
-        padding: 0 32px;
-    }
+.fs-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 32px;
+}
 
-    .fs-archive {
-        color: #111;
-    }
+.fs-archive {
+    color: #111;
+}
 
-    .fs-archive * {
-        box-sizing: border-box;
-    }
+.fs-archive * {
+    box-sizing: border-box;
+}
 
-    .fs-archive button {
-        all: unset;
-        cursor: pointer;
-    }
+.fs-archive button {
+    cursor: pointer;
+    background-color: transparent!important;
+}
 
-    /* ================================
+/* ================================
    LAYOUT GRID
 ================================ */
 
+.fs-archive__layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 60px;
+}
+
+.fs-archive__sidebar {
+    padding-right: 20px;
+}
+
+.fs-archive__sidebar form {
+    border-right: none !important;
+}
+
+@media (max-width:1024px) {
     .fs-archive__layout {
-        display: grid;
-        grid-template-columns: 260px 1fr;
-        gap: 60px;
+        display: block;
     }
 
-    .fs-archive__sidebar form {
+    .fs-archive__sidebar {
+        font-size: 12px;
+        display: none;
         border-right: 1px solid #84cc16 !important;
+        margin-top: 1rem;
     }
+}
 
-    @media(max-width:1024px) {
-        .fs-archive__layout {
-            display: block;
-        }
+.fs-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2rem;
+}
 
-        .fs-archive__sidebar {
-            font-size: 12px;
-            display: none;
-            border-right: 1px solid #84cc16 !important;
-            margin-top: 1rem;
-        }
-    }
-
+@media (min-width:1024px) {
     .fs-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 2rem 2rem;
+        grid-template-columns: repeat(4, 1fr);
     }
+}
 
-    @media(min-width:1024px) {
-        .fs-grid {
-            grid-template-columns: repeat(4, 1fr);
-            gap: 2rem 2rem;
-        }
-    }
-
-    /* ================================
+/* ================================
    PRODUCT CARD
 ================================ */
 
-    .fs-card {
-        text-decoration: none;
-        color: #111;
-    }
+.fs-card {
+    text-decoration: none;
+    color: #111;
+}
 
-    .fs-card__image {
-        background: #f6f6f6;
-        padding: 5px;
-        aspect-ratio: 5/8;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 4px;
-    }
+.fs-card__image {
+    background: #f6f6f6;
+    padding: 5px;
+    aspect-ratio: 5/8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+}
 
-    .fs-card__image img {
-        max-width: 100%;
-        height: auto;
-        transition: .3s;
-    }
+.fs-card__image img {
+    max-width: 100%;
+    height: auto;
+    transition: .3s;
+}
 
-    .fs-card:hover .fs-card__image img {
-        transform: scale(1.05);
-    }
+.fs-card:hover .fs-card__image img {
+    transform: scale(1.05);
+}
 
-    .fs-card__body {
-        color: #000000 !important;
-        margin-top: 0.5rem;
-    }
+.fs-card__body {
+    color: #000 !important;
+    margin-top: 0.5rem;
+}
 
-    .fs-card__body:hover {
-        color: #84cc16 !important;
-        margin-top: 18px;
-    }
+.fs-card__body:hover {
+    color: #84cc16 !important;
+    margin-top: 18px;
+}
 
-    .fs-card__price {
-        font-size: 13px;
-        font-weight: 600;
-        margin-bottom: 0.4rem;
-    }
+.fs-card__price {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 0.4rem;
+}
 
-    .fs-card__title {
-        font-size: 13px;
-        font-weight: 500;
-        letter-spacing: .3px;
-    }
+.fs-card__title {
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: .3px;
+}
 
-    /* ================================
+/* ================================
    FILTERS
 ================================ */
 
-    .fs-filter {
-        border-bottom: 1px solid #84cc16;
-        width: 90%;
-        padding: 10px 0;
-    }
+.fs-filter {
+    border-bottom: 1px solid #84cc16;
+    width: 100%;
+}
 
-    .fs-filter__header {
-        display: flex;
-        justify-content: space-between;
-        font-size: 14px;
-        font-weight: 600;
-    }
+/* HEADER */
 
-    .fs-filter__body {
-        font-weight: 600;
-        display: none;
-        margin-top: 1rem;
-    }
 
-    .fs-filter.is-open .fs-filter__body {
-        display: flex;
-        /* o block si no necesitas flex */
-        flex-wrap: wrap;
-        /* si quieres layout horizontal */
-        gap: 12px;
-        /* opcional */
-    }
+.fs-filter__header {
+    all: revert !important; /* revertimos el all: unset global */
+    display: block !important;
+    width: 100% !important;
+    padding: 1rem 2.5rem 1rem 1rem !important;
+    background: transparent !important;
+    border: 0 !important;
+    cursor: pointer !important;
+    font-size: 14px !important;
+    text-align: left !important;
+    position: relative !important;
+    font-family: Montserrat, sans-serif!important;
+}
 
-    .fs-filter__option {
-        display: block;
-        font-size: 13px;
-        margin-bottom: 6px;
-    }
+/* ICONO BASE (+) */
 
-    .fs-filter__submit {
-        margin-top: 20px;
-        background: #111;
-        color: #fff;
-        padding: 10px 16px;
-        font-size: 13px;
-    }
+.fs-filter__header::after {
+    content: "+";
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    line-height: 1;
+    pointer-events: none;
+    font-style: inherit!important;
+    font-family: Montserrat, sans-serif!important
+}
 
-    /* ================================
-   COLOR SWATCHES (FIXED)
+/* CUANDO ESTÁ ABIERTO → (-) */
+
+.fs-filter.is-open > .fs-filter__header::after {
+    content: "–";
+}
+
+/* ESTADO ACTIVO / ABIERTO */
+
+.fs-filter.is-open .fs-filter__header,
+.fs-filter.is-active .fs-filter__header {
+    background: #84cc16;
+    color: #111;
+}
+
+/* BODY */
+
+.fs-filter__body {
+    display: none;
+    margin-top: 12px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.fs-filter.is-open .fs-filter__body {
+    display: flex;
+    padding: 0 0 12px 0;
+}
+
+/* OPTIONS */
+
+.fs-filter__option {
+    text-align: center;
+    padding: 10px 12px;
+    border-radius: 4px;
+    border: 1px solid #84cc16;
+    background: #f4f4f4;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: background 0.2s ease, color 0.2s ease, border 0.2s ease;
+}
+
+.fs-filter__option input {
+    display: none;
+}
+
+.fs-filter__option:hover {
+    background: #84cc16;
+    color: #fff;
+}
+
+.fs-filter__option:has(input:checked) {
+    background: #84cc16;
+    color: #fff;
+}
+
+/* SUBMIT */
+
+.fs-filter__submit {
+    margin-top: 20px;
+    background: #111;
+    color: #fff;
+    padding: 10px 16px;
+    font-size: 13px;
+}
+
+/* ================================
+   COLOR SWATCHES
 ================================ */
 
-    .fs-color-swatches {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        padding: 6px 0;
-    }
+.fs-color-swatches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 6px 0;
+}
 
-    .fs-color-choice {
-        display: inline-flex;
-        align-items: center;
-        cursor: pointer;
-    }
+.fs-color-choice {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+}
 
-    .fs-color-input {
-        position: absolute;
-        opacity: 0;
-        pointer-events: none;
-    }
+.fs-color-input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
 
-    .fs-color-swatch {
-        width: 25px;
-        height: 25px;
-        border-radius: 50%;
-        border: 2px solid #e5e5e5;
-        background-color: var(--swatch-bg, #e5e7eb);
-        /* fallback real */
-        background: var(--swatch-bg, #e5e7eb);
-        position: relative;
-        transition: .15s ease;
-    }
+.fs-color-swatch {
+    width: 25px;
+    height: 25px;
+    border-radius: 50%;
+    border: 2px solid #e5e5e5;
+    background: var(--swatch-bg, #e5e7eb);
+    position: relative;
+    transition: .15s ease;
+}
 
-    /* Overlay mucho más sutil */
-    .fs-color-swatch::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        border-radius: 50%;
-        background: linear-gradient(135deg,
-                rgba(255, 255, 255, .35) 0%,
-                rgba(255, 255, 255, .15) 35%,
-                rgba(0, 0, 0, .08) 100%);
-        pointer-events: none;
-    }
+.fs-color-swatch::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: linear-gradient(
+        135deg,
+        rgba(255,255,255,.35) 0%,
+        rgba(255,255,255,.15) 35%,
+        rgba(0,0,0,.08) 100%
+    );
+    pointer-events: none;
+}
 
-    .fs-color-choice:hover .fs-color-swatch {
-        transform: scale(1.08);
-        border-color: #111;
-    }
+.fs-color-choice:hover .fs-color-swatch {
+    transform: scale(1.08);
+    border-color: #111;
+}
 
+.fs-color-input:checked + .fs-color-swatch {
+    border-color: #000;
+    box-shadow: 0 0 0 2px #000 inset;
+}
 
-    /* ================================
+/* ================================
    DISABLED STATES
 ================================ */
 
-    .fs-filter__option.is-disabled,
-    .fs-color-choice.is-disabled {
-        opacity: .35;
-        pointer-events: none;
-        filter: grayscale(1);
-    }
+.fs-filter__option.is-disabled,
+.fs-color-choice.is-disabled {
+    opacity: .35;
+    pointer-events: none;
+    filter: grayscale(1);
+}
 
-    /* ================================
+/* ================================
    PRICE
 ================================ */
 
-    .fs-price__input {
-        width: 100%;
-        padding: 10px 12px;
-        border: 1px solid #e5e5e5;
-        font-size: 13px;
-    }
+.fs-price__input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #e5e5e5;
+    font-size: 13px;
+}
 
-    .fs-price__hint {
-        margin-top: 10px;
-        font-size: 12px;
-        opacity: .75;
-    }
+.fs-price__hint {
+    margin-top: 10px;
+    font-size: 12px;
+    opacity: .75;
+}
 
-    .fs-price__warn {
-        margin-top: 10px;
-        font-size: 12px;
-        color: #b91c1c;
-    }
+.fs-price__warn {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #b91c1c;
+}
 
-    /* ================================
+/* ================================
    ACTIVE CHIPS
 ================================ */
 
-    .fs-active-filters {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin: 20px 0 10px;
-    }
+.fs-active-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 20px 0 10px;
+}
 
-    .fs-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 6px 12px;
-        border-radius: 999px;
-        background: #f3f4f6;
-        font-size: 12px;
-        text-decoration: none;
-        color: #111;
-        border: 1px solid #e5e7eb;
-        transition: .2s;
-    }
+.fs-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    text-decoration: none;
+    border: 1px solid #84cc16!important;
+    transition: .2s;
+}
 
-    .fs-chip:hover {
-        background: #111;
-        color: #fff;
-    }
+.fs-chip button{
+    background-color: transparent!important;
+}
+.fs-chip:hover {
+        background-color: #84cc16!important;
+    border: 1px solid #84cc16;
+    border-radius: 4px;
+    color: #fff;
+}
 
-    .fs-chip--clear {
-        background: #000;
-        color: #fff;
-    }
+.fs-chip--clear {
+    background: #000;
+    color: #fff;
+}
 
-    .fs-filter__header {
-        position: relative;
-        padding-right: 20px;
-    }
+/* ================================
+   AJAX LOADING
+================================ */
 
-    .fs-filter__header::after {
-        content: "+";
-        position: absolute;
-        right: 0;
-        top: 50%;
-        transform: translateY(-50%);
-        font-weight: 600;
-        transition: .2s;
-    }
+#fs-grid-wrapper {
+    transition: opacity .2s ease;
+}
 
-    .fs-filter.is-open .fs-filter__header::after {
-        content: "–";
-    }
+#fs-grid-wrapper.is-loading {
+    opacity: .4;
+    pointer-events: none;
+}
 
-    .fs-filter.is-active .fs-filter__header {
-        color: #84cc16;
-    }
-
-    /* ==========================================
-   AJAX LOADING FIX
-========================================== */
-
-    #fs-grid-wrapper {
-        transition: opacity .2s ease;
-    }
-
-    #fs-grid-wrapper.is-loading {
-        opacity: .4;
-        pointer-events: none;
-    }
-
-    /* ==========================================
-   FILTER ACTIVE STATE
-========================================== */
-
-    .fs-filter.is-active .fs-filter__header {
-        color: #84cc16;
-    }
-
-    /* ==========================================
-   SWATCH CHECKED STATE
-========================================== */
-
-    .fs-color-input:checked+.fs-color-swatch {
-        border-color: #000;
-        box-shadow: 0 0 0 2px #000 inset;
-    }
 </style>
 
 <section class="fs-archive">
 
-    <div class="fs-container">
-        <h1>Zapatillas de Fútbol Sala</h1>
-        <p>Busca la zapatilla que deseas.</p>
-    </div>
+    <section class="fs-container">
+        <h1>Zapatillas de fútbol sala al mejor precio</h1>
+        <p>
+            Compra zapatillas de fútbol sala indoor para hombre, mujer e infantil. 
+            Filtra por talla, marca, color y precio para encontrar tu modelo ideal al mejor precio online.
+        </p>
+    </section>
 
     <div class="fs-archive__layout fs-container">
 
@@ -852,6 +887,15 @@ if (!is_array($tallas) || is_wp_error($tallas)) {
           formData.forEach((value, key) => {
         
             if (!value) return;
+            
+            const humanize = (str) => {
+              if (!str) return '';
+              return str
+                .replace(/[-_]/g, ' ')
+                .split(' ')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+            };
         
             const chip = document.createElement('button');
             chip.type = 'button';
@@ -859,8 +903,7 @@ if (!is_array($tallas) || is_wp_error($tallas)) {
             chip.dataset.key = key;
             chip.dataset.value = value;
         
-            chip.innerHTML = `${value} <span aria-hidden="true">×</span>`;
-        
+            chip.innerHTML = `${humanize(value)} <span aria-hidden="true">×</span>`;
             chip.addEventListener('click', function () {
         
               const name = this.dataset.key;
@@ -1036,7 +1079,8 @@ if (!is_array($tallas) || is_wp_error($tallas)) {
             royal: '#4169E1',
             marino: '#000080',
             bordeaux: '#800000',
-            fluor: '#CCFF00',
+            fluor: '#d4ed31',
+            neon: '#d4ed31',
             fucsia: '#FF00FF',
             multicolor: '#999999',
             blanco_coral: '#FF7F50'

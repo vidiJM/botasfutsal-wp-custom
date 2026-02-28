@@ -35,7 +35,8 @@
     royal:'#4169E1',
     marino:'#000080',
     bordeaux:'#800000',
-    neon:'#39FF14',
+    neon:'#d4ed31',
+    fluor: '#d4ed31',
     fucsia:'#FF00FF',
     multicolor:'#999999'
   };

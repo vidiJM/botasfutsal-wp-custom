@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
         verde:'#008000',
         verde_fluor:'#39FF14',
         amarillo:'#FFFF00',
-        amarillo_fluor:'#CCFF00',
+        amarillo_fluor:'#d4ed31',
         naranja:'#FFA500',
         gris:'#808080',
         gris_claro:'#CDCDCD',
@@ -61,8 +61,9 @@ document.addEventListener('DOMContentLoaded', () => {
         royal:'#4169E1',
         marino:'#000080',
         bordeaux:'#800000',
-        neon:'#39FF14',
+        neon:'#d4ed31',
         fucsia:'#FF00FF',
+        fluor: '#d4ed31',
         multicolor:'#999999'
     };
 
@@ -116,47 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const renderActivePills = () => {
         if (!pillsContainer) return;
-
-        const entries = Object.entries(activeFilters);
-        if (!entries.length) {
-            pillsContainer.innerHTML = '';
-            return;
-        }
-
-        const pills = [];
-
-        // Normal pills
-        for (const [key, value] of entries) {
-            if (key === 'price_min' || key === 'price_max') continue;
-
-            pills.push(`
-                <button type="button" class="fs-filter-pill" data-pill="${escapeHtml(key)}">
-                    <span class="fs-filter-pill__label">${escapeHtml(humanizeKey(key))}:</span>
-                    <span class="fs-filter-pill__value">${escapeHtml(value)}</span>
-                    <span class="fs-pill-remove" aria-hidden="true">&times;</span>
-                </button>
-            `);
-        }
-
-        // Price pill (si están ambos)
-        if (activeFilters.price_min !== undefined && activeFilters.price_max !== undefined) {
-            pills.push(`
-                <button type="button" class="fs-filter-pill" data-pill="price">
-                    <span class="fs-filter-pill__label">${escapeHtml(humanizeKey('price_min'))}/${escapeHtml(humanizeKey('price_max'))}:</span>
-                    <span class="fs-filter-pill__value">${escapeHtml(activeFilters.price_min)}€ - ${escapeHtml(activeFilters.price_max)}€</span>
-                    <span class="fs-pill-remove" aria-hidden="true">&times;</span>
-                </button>
-            `);
-        }
-
-        // Clear all (opcional, pero muy útil)
-        pills.push(`
-            <button type="button" class="fs-filter-pill fs-filter-pill--clear" data-fs-clear-filters>
-                Limpiar todo
-            </button>
-        `);
-
-        pillsContainer.innerHTML = pills.join('');
+        pillsContainer.innerHTML = '';
     };
 
     /* =============================
@@ -220,6 +181,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     overlay.addEventListener('click', (e) => {
+        
+        /* =============================
+           REMOVE FILTER (SIDEBAR PILL)
+        ============================= */
+        const removeIcon = e.target.closest('.fs-remove');
+            if (removeIcon) {
+            
+                const button = removeIcon.closest('[data-filter]');
+                if (!button) return;
+            
+                const key = button.dataset.filter;
+            
+                delete activeFilters[key];
+                performSearch(lastQuery);
+                return;
+            }
 
         /* =============================
            CLEAR ALL
@@ -275,20 +252,15 @@ document.addEventListener('DOMContentLoaded', () => {
            ACCORDION
         ============================= */
         const header = e.target.closest('.fs-filter-header');
-        if (header) {
-    
-            const section = header.closest('.fs-filter-section');
-            if (!section) return;
-    
-            const isActive = section.classList.contains('active');
-    
-            overlay.querySelectorAll('.fs-filter-section')
-                .forEach(s => s.classList.remove('active'));
-    
-            if (!isActive) section.classList.add('active');
-    
-            return;
-        }
+            if (header) {
+            
+                const section = header.closest('.fs-filter-section');
+                if (!section) return;
+            
+                section.classList.toggle('active');
+            
+                return;
+            }
     
     });
 
@@ -332,11 +304,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const values = filters[key];
             if (!values) {
-                delete activeFilters[key];
+                // No borramos el filtro activo si la intersección es vacía.
                 continue;
             }
 
-            if (Array.isArray(values)) {
+            if (Array.isArray(values) && values.length > 0) {
                 const available = values.map(v => {
                     if (typeof v === 'object' && v !== null && 'slug' in v) return normalize(String(v.slug));
                     return normalize(String(v));
@@ -555,21 +527,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (Array.isArray(values) && key === 'color') {
 
-                // Puede venir como ["rojo", "azul"] o como [{slug,name,count}, ...]
                 const colorTerms = isTermObjectArray(values)
                     ? values.map(v => ({ slug: normalize(v.slug), count: Number(v.count ?? 0) }))
                     : values.map(v => ({ slug: normalize(String(v)), count: 1 }));
-
-                // Normalizamos + evitamos duplicados por combinaciones de color
+            
                 const unique = new Map();
-
+            
                 colorTerms.forEach(({ slug, count }) => {
-
+            
                     const parts = slug.split('-');
                     const hexParts = parts.map(resolveHex);
                     const hexKey = [...hexParts].sort().join('|');
-
-                    // guardamos el "mejor" (si hay count, mantener el mayor)
+            
                     if (!unique.has(hexKey)) {
                         unique.set(hexKey, { slug, hexParts, count });
                     } else {
@@ -577,37 +546,37 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (count > (existing.count ?? 0)) unique.set(hexKey, { slug, hexParts, count });
                     }
                 });
-
-                const sorted = [...unique.values()]
-                    .sort((a, b) => a.slug.localeCompare(b.slug));
-
+            
+                const sorted = [...unique.values()].sort((a, b) => a.slug.localeCompare(b.slug));
+            
                 container.innerHTML = sorted.map(entry => {
-
+            
+                    const slug = entry.slug;
+            
                     let background;
-
-                    if (entry.slug === 'multicolor') {
+                    if (slug === 'multicolor') {
                         background = 'linear-gradient(45deg, red, orange, yellow, green, blue, purple)';
                     } else {
                         background = entry.hexParts.length === 1
                             ? entry.hexParts[0]
                             : `linear-gradient(45deg, ${entry.hexParts.join(',')})`;
                     }
-
-                    // Si el backend devuelve count=0, deshabilitamos
+            
                     const isAvailable = Number.isFinite(entry.count) ? entry.count > 0 : true;
-
+                    const isActive = activeFilters.color === slug;
+            
                     return `
                         <button type="button"
                             data-filter="color"
-                            data-value="${escapeHtml(entry.slug)}"
-                            title="${escapeHtml(entry.slug.replace(/[-_]/g,' '))}"
-                            class="fs-color-dot ${activeFilters[key] === entry.slug ? 'active' : ''} ${!isAvailable ? 'is-disabled' : ''}"
+                            data-value="${escapeHtml(slug)}"
+                            title="${escapeHtml(slug.replace(/[-_]/g,' '))}"
+                            class="fs-color-dot ${isActive ? 'active' : ''} ${!isAvailable ? 'is-disabled' : ''}"
                             style="background:${background}"
                             ${!isAvailable ? 'disabled' : ''}>
                         </button>
                     `;
                 }).join('');
-
+            
                 return;
             }
 
@@ -617,51 +586,61 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (Array.isArray(values)) {
 
-                // Arrays pueden venir como ["adidas", ...] o como [{slug,name,count}, ...]
                 if (isTermObjectArray(values)) {
+            
                     container.innerHTML = values.map(term => {
-                        const slug = normalize(String(term.slug));
+            
+                        const slug  = normalize(String(term.slug));
                         const label = term.name ?? term.slug;
                         const count = Number(term.count ?? 0);
                         const isAvailable = Number.isFinite(count) ? count > 0 : true;
-                        const text = Number.isFinite(count) && count > 0 ? `${label} (${count})` : label;
-
+                        const isActive = activeFilters[key] === slug;
+            
                         return `
                             <button type="button"
                                 data-filter="${escapeHtml(key)}"
                                 data-value="${escapeHtml(slug)}"
-                                class="${activeFilters[key] === slug ? 'active' : ''} ${!isAvailable ? 'is-disabled' : ''}"
+                                class="fs-filter-option ${isActive ? 'active' : ''}"
                                 ${!isAvailable ? 'disabled' : ''}>
-                                ${escapeHtml(text)}
+                                ${escapeHtml(label)}
+                                ${isActive ? '<span class="fs-remove">×</span>' : ''}
                             </button>
                         `;
                     }).join('');
+            
                 } else {
+            
                     container.innerHTML = values.map(val => {
-                        const v = normalize(String(val));
-                        // aquí no tenemos count, asumimos disponible
+            
+                        const slug = normalize(String(val));
+                        const isActive = activeFilters[key] === slug;
+            
                         return `
                             <button type="button"
                                 data-filter="${escapeHtml(key)}"
-                                data-value="${escapeHtml(v)}"
-                                class="${activeFilters[key] === v ? 'active' : ''}">
+                                data-value="${escapeHtml(slug)}"
+                                class="fs-filter-option ${isActive ? 'active' : ''}">
                                 ${escapeHtml(val)}
+                                ${isActive ? '<span class="fs-remove">×</span>' : ''}
                             </button>
                         `;
                     }).join('');
                 }
-
+            
             } else {
-
-                // Objeto mapa {slug: "Label"}
+            
                 container.innerHTML = Object.entries(values).map(([slug, label]) => {
-                    const s = normalize(String(slug));
+            
+                    const normalizedSlug = normalize(String(slug));
+                    const isActive = activeFilters[key] === normalizedSlug;
+            
                     return `
                         <button type="button"
                             data-filter="${escapeHtml(key)}"
-                            data-value="${escapeHtml(s)}"
-                            class="${activeFilters[key] === s ? 'active' : ''}">
+                            data-value="${escapeHtml(normalizedSlug)}"
+                            class="fs-filter-option ${isActive ? 'active' : ''}">
                             ${escapeHtml(label)}
+                            ${isActive ? '<span class="fs-remove">×</span>' : ''}
                         </button>
                     `;
                 }).join('');
@@ -674,102 +653,81 @@ document.addEventListener('DOMContentLoaded', () => {
        RESULTS - ADIDAS STYLE
     ============================= */
     const renderResults = (items, hasMore = false) => {
-        
-        if (!results) return;
-    
-        if (!items.length) {
-            results.innerHTML = `
-                <div class="fs-search-empty">
-                    No hemos encontrado productos
-                </div>
-            `;
-            return;
-        }
-    
-        const cards = items.map(item => {
-    
-            const colorsCount = item.colors_count ?? 0;
-            const priceFrom = item.price_from ?? item.price ?? '';
-    
-            const permalink = item.permalink ? String(item.permalink) : '#';
-            const img = item.image ? String(item.image) : '';
-            const name = item.name ? String(item.name) : '';
-            const brand = item.brand ? String(item.brand) : '';
-    
-            return `
-                <a href="${escapeHtml(permalink)}" class="fs-product-card">
-    
-                    <div class="fs-product-card__image">
-                        ${
-                            img
-                                ? `<img src="${escapeHtml(img)}" alt="${escapeHtml(name)}" loading="lazy">`
-                                : ''
-                        }
-                    </div>
-    
-                    <div class="fs-product-card__content">
-    
-                        ${brand
-                            ? `<div class="fs-product-card__brand">${escapeHtml(brand)}</div>`
+
+    if (!results) return;
+
+    if (!items.length) {
+        results.innerHTML = `
+            <div class="fs-search-empty">
+                No hemos encontrado productos
+            </div>
+        `;
+        return;
+    }
+
+    const cards = items.map(item => {
+
+        const permalink   = item.permalink ? String(item.permalink) : '#';
+        const img         = item.image ? String(item.image) : '';
+        const name        = item.name ? String(item.name) : '';
+        const brand       = item.brand ? String(item.brand) : '';
+        const priceFrom   = item.price_from ?? null;
+
+        const colorsCount = item.colors_count ?? 0;
+        const sizesCount  = Array.isArray(item.sizes) ? item.sizes.length : 0;
+
+        return `
+            <a href="${escapeHtml(permalink)}" class="fs-product-card">
+
+                <div class="fs-product-card__image">
+                    ${
+                        img
+                            ? `<img src="${escapeHtml(img)}" alt="${escapeHtml(name)}" loading="lazy">`
                             : ''
-                        }
-    
-                        <h3 class="fs-product-card__title">
-                            ${escapeHtml(name)}
-                        </h3>
-    
-                        ${
-                            priceFrom !== ''
-                                ? `<div class="fs-product-card__price">
-                                       Desde ${escapeHtml(priceFrom)} €
-                                   </div>`
-                                : ''
-                        }
-    
+                    }
+                </div>
+
+                <div class="fs-product-card__content">
+
+                    ${brand
+                        ? `<div class="fs-product-card__brand">${escapeHtml(brand)}</div>`
+                        : ''
+                    }
+
+                    <h3 class="fs-product-card__title">
+                        ${escapeHtml(name)}
+                    </h3>
+
+                    ${
+                        priceFrom !== null
+                            ? `<div class="fs-product-card__price">
+                                   Desde ${escapeHtml(priceFrom)} €
+                               </div>`
+                            : ''
+                    }
+
+                    <div class="fs-product-card__meta">
+
                         ${
                             colorsCount > 0
-                                ? `<div class="fs-product-card__colors">
-                                       ${colorsCount === 1 ? '1 color' : `${escapeHtml(colorsCount)} colores`}
-                                   </div>`
+                                ? `<span>${colorsCount} ${colorsCount === 1 ? 'color' : 'colores'}</span>`
                                 : ''
                         }
-    
-                    </div>
-                </a>
-            `;
-        }).join('');
-    
-        let moreButton = '';
-    
-        if (hasMore) {
-    
-            const baseUrl = 'https://botasfutsal.com/zapatillas-futbol-sala/';
-    
-            const params = new URLSearchParams();
-    
-            if (lastQuery) {
-                params.append('q', lastQuery);
-            }
-    
-            Object.entries(activeFilters).forEach(([key, value]) => {
-                if (value !== undefined && value !== null && value !== '') {
-                    params.append(key, value);
-                }
-            });
-    
-            const finalUrl = `${baseUrl}?${params.toString()}`;
-    
-            moreButton = `
-                <div class="fs-search-more-wrapper">
-                    <a href="${escapeHtml(finalUrl)}" class="fs-search-more">
-                        Ver más resultados
-                    </a>
-                </div>
-            `;
-        }
-    
-        results.innerHTML = cards + moreButton;
-    };
 
+                        ${
+                            sizesCount > 0
+                                ? `<span>${sizesCount} ${sizesCount === 1 ? 'talla disponible' : 'tallas disponibles'}</span>`
+                                : ''
+                        }
+
+                    </div>
+
+                </div>
+            </a>
+        `;
+    }).join('');
+
+    results.innerHTML = cards;
+};
 });
 })();

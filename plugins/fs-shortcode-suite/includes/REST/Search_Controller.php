@@ -94,7 +94,7 @@ public function handle(WP_REST_Request $request): WP_REST_Response
 
         // 🔥 Siempre usar search()
         $result = $this->service->search($q, $filters);
-
+        error_log(print_r($result, true));
         return new WP_REST_Response($result, 200);
 
     } catch (\Throwable $e) {
