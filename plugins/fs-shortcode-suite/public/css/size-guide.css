@@ -1,5 +1,9 @@
+/* =====================================
+   SIZE GUIDE – MOBILE FIRST
+===================================== */
+
 .fs-size-guide {
-  padding: 40px 20px;
+  padding: 32px 16px;
   background: #ffffff;
 }
 
@@ -8,156 +12,163 @@
   margin: 0 auto;
 }
 
+/* =====================================
+   HEADER
+===================================== */
+
 .fs-size-guide__header {
-  margin-bottom: 40px;
+  margin-bottom: 32px;
+  text-align: center;
 }
 
 .fs-size-guide__header h1 {
-  font-size: 32px;
-  margin: 0 0 12px;
-  color: #1F2A3F; /* azul oscuro brand */
+  font-size: 26px;
+  margin-bottom: 10px;
+  color: #1F2A3F;
+  line-height: 1.2;
 }
 
 .fs-size-guide__header p {
-  margin: 0;
-  color: #6B7A8F;
-}
-
-.fs-size-guide__brands {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.fs-size-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 18px 20px;
-  border-radius: 4px;
-  text-decoration: none;
-  border: 1px solid #e6e8eb;
-  transition: all .2s ease;
-  background: #fff;
-}
-
-.fs-size-card:hover {
-  border-color: #7AC70C; /* verde lima */
-  transform: translateY(-2px);
-}
-
-.fs-size-card__brand {
-  font-size: 18px;
-  font-weight: 600;
-  color: #1F2A3F;
-}
-
-.fs-size-card__cta {
-  font-size: 14px;
-  color: #7AC70C;
-}
-
-.fs-size-guide__note {
-  margin-top: 40px;
-  font-size: 14px;
-  color: #6B7A8F;
-}
-
-/* Desktop */
-@media (min-width: 768px) {
-
-  .fs-size-guide__brands {
-    flex-direction: row;
-  }
-
-  .fs-size-card {
-    flex: 1;
-  }
-
-}
-.fs-size-section {
-  margin-top: 60px;
-}
-
-.fs-size-section h2 {
-  font-size: 22px;
-  margin-bottom: 16px;
-  color: #1F2A3F;
-}
-
-.fs-size-section p,
-.fs-size-section li {
-  color: #6B7A8F;
   font-size: 15px;
-  line-height: 1.6;
+  color: #6B7A8F;
 }
 
-.fs-size-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 16px;
-  margin-top: 20px;
+/* =====================================
+   WIZARD
+===================================== */
+
+.fs-size-wizard {
+  background: #f8fafc;
+  padding: 24px;
+  border-radius: 14px;
 }
 
-@media (min-width: 768px) {
-  .fs-size-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
+.fs-step {
+  margin-bottom: 32px;
 }
 
-.fs-size-box {
-  padding: 20px;
-  border: 1px solid #e6e8eb;
-  border-radius: 4px;
-  background: #fff;
-  transition: all .2s ease;
-}
-
-.fs-size-box:hover {
-  border-color: #7AC70C;
-  transform: translateY(-3px);
-}
-
-.fs-size-box h3 {
-  margin: 0 0 10px;
+.fs-step__title {
+  font-weight: 600;
+  margin-bottom: 12px;
   font-size: 16px;
   color: #1F2A3F;
 }
+
+/* =====================================
+   BUTTON GROUPS
+===================================== */
+
 .fs-player-selector {
   display: flex;
+  flex-direction: column;
   gap: 10px;
-  flex-wrap: wrap;
 }
 
-.fs-player-btn {
-  padding: 10px 16px;
+.fs-player-btn,
+.fs-foot-btn,
+.fs-brand-btn {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px;
+  border-radius: 8px;
   border: 1px solid #e6e8eb;
-  border-radius: 4px;
   background: #fff;
-  cursor: pointer;
   font-size: 14px;
+  cursor: pointer;
   transition: all .2s ease;
 }
 
 .fs-player-btn.active,
-.fs-player-btn:hover {
+.fs-foot-btn.active,
+.fs-brand-btn.active {
   background: #7AC70C;
   color: #fff;
   border-color: #7AC70C;
 }
 
+/* =====================================
+   INPUT + CALCULATOR
+===================================== */
+
+.fs-calc-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#fs-foot-cm {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #dcdfe3;
+  font-size: 15px;
+}
+
+#fs-calc-btn {
+  min-height: 48px;
+  border-radius: 8px;
+  border: none;
+  background: #7AC70C;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s ease;
+}
+
+#fs-calc-btn:active {
+  transform: scale(.98);
+}
+
+.fs-calc-result {
+  margin-top: 10px;
+  font-size: 14px;
+  color: #1F2A3F;
+}
+
+/* =====================================
+   RECOMMENDATION
+===================================== */
+
 .fs-player-recommendation {
   margin-top: 16px;
-  padding: 16px;
-  border-radius: 4px;
-  background: #f9fafb;
+  padding: 14px;
+  border-radius: 8px;
+  background: #f1f5f9;
   font-size: 14px;
+  color: #1F2A3F;
+}
+
+/* =====================================
+   RESULT BOX
+===================================== */
+
+.fs-result-box {
+  margin-top: 20px;
+  padding: 18px;
+  border-radius: 12px;
+  background: #eaffd4;
+  font-weight: 500;
+  display: none;
+  font-size: 15px;
+}
+
+/* =====================================
+   TABLE SECTION
+===================================== */
+
+.fs-size-section {
+  margin-top: 60px;
+}
+
+.fs-size-section h2 {
+  font-size: 18px;
+  margin-bottom: 14px;
   color: #1F2A3F;
 }
 
 .fs-table-wrapper {
   overflow-x: auto;
-  margin-top: 20px;
 }
 
 .fs-size-table {
@@ -168,13 +179,128 @@
 
 .fs-size-table th,
 .fs-size-table td {
-  padding: 12px;
-  text-align: left;
+  padding: 10px;
   border-bottom: 1px solid #e6e8eb;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .fs-size-table th {
   background: #f3f4f6;
   font-weight: 600;
+}
+
+.fs-highlight {
+  background: #eaffd4;
+}
+
+/* =====================================
+   BRAND GRID
+===================================== */
+
+.fs-size-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+.fs-size-box {
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid #e6e8eb;
+  background: #fff;
+}
+
+.fs-size-box h3 {
+  margin-bottom: 8px;
+  font-size: 15px;
+  color: #1F2A3F;
+}
+
+.fs-size-box p {
+  font-size: 14px;
+  color: #6B7A8F;
+  line-height: 1.5;
+}
+
+/* =====================================
+   OFFICIAL LINKS
+===================================== */
+
+.fs-size-guide__brands {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fs-size-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid #e6e8eb;
+  background: #fff;
+  text-decoration: none;
+}
+
+.fs-size-card__brand {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1F2A3F;
+}
+
+.fs-size-card__cta {
+  font-size: 13px;
+  color: #7AC70C;
+}
+
+/* =====================================
+   TABLET
+===================================== */
+
+@media (min-width: 640px) {
+
+  .fs-player-selector {
+    flex-direction: row;
+  }
+
+  .fs-player-btn,
+  .fs-foot-btn,
+  .fs-brand-btn {
+    width: auto;
+    flex: 1;
+  }
+
+  .fs-calc-inputs {
+    flex-direction: row;
+  }
+
+  #fs-foot-cm {
+    flex: 2;
+  }
+
+  #fs-calc-btn {
+    flex: 1;
+  }
+
+  .fs-size-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+}
+
+/* =====================================
+   DESKTOP
+===================================== */
+
+@media (min-width: 1024px) {
+
+  .fs-size-guide__header h1 {
+    font-size: 32px;
+  }
+
+  .fs-size-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
 }

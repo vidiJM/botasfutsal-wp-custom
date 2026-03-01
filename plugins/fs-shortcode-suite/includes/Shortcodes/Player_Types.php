@@ -40,19 +40,19 @@ final class Player_Types
                     <?php
                     echo $this->card(
                         496413,
-                        home_url('/fs_caracteristica/resistencia/'));
+                        home_url('/zapatillas-futbol-sala-para/resistencia/'));
 
                     echo $this->card(
                         496417,
-                        home_url('/fs_caracteristica/calidad-precio/'));
+                        home_url('/zapatillas-futbol-sala-para/calidad-precio/'));
 
                     echo $this->card(
                         496411,
-                        home_url('/fs_caracteristica/velocidad/'));
+                        home_url('/zapatillas-futbol-sala-para/velocidad/'));
 
                     echo $this->card(
                         496412,
-                        home_url('/fs_caracteristica/control/'));
+                        home_url('/zapatillas-futbol-sala-para/control/'));
                     ?>
 
                 </div>
