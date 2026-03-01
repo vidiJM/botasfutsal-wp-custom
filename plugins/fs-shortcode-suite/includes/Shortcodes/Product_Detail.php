@@ -18,131 +18,253 @@ final class Product_Detail
     }
 
     public function render(): string
-    {
-        if (!is_singular('fs_producto')) {
-            return '';
-        }
-
-        global $post;
-
-        if (!$post instanceof \WP_Post) {
-            return '';
-        }
-
-        $product_id = (int) $post->ID;
-
-        $data = $this->build_product_data($product_id);
-
-        if (empty($data['colors'])) {
-            return '';
-        }
-
-        Assets::enqueue_product_detail();
-
-        wp_add_inline_script(
-            'fs-product-detail',
-            'window.FS_PRODUCT_DATA = ' . wp_json_encode($data) . ';',
-            'before'
-        );
-
-        ob_start();
-        ?>
-
-        <section class="fs-product-detail">
-
-            <div class="fs-product-detail__gallery">
-                <div class="fs-product-detail__thumbs"></div>
-
-                <div class="fs-product-detail__main-wrapper">
-                    <button type="button" class="fs-product-detail__nav fs-product-detail__nav--prev">‹</button>
-                    <img src="" class="fs-product-detail__main-image" alt="">
-                    <button type="button" class="fs-product-detail__nav fs-product-detail__nav--next">›</button>
-                </div>
-            </div>
-
-            <div class="fs-product-detail__info">
-                <h1 class="fs-product-detail__title">
-                    <?php echo esc_html(get_the_title($product_id)); ?>
-                </h1>
-
-                <div class="fs-product-detail__price"></div>
-                <div class="fs-product-detail__colors"></div>
-                <div class="fs-product-detail__sizes"></div>
-
-                <a href="#"
-                   target="_blank"
-                   rel="noopener"
-                   class="fs-product-detail__cta">
-                    Ir a tienda
-                </a>
-            </div>
-
-            <div class="fs-product-detail__description"></div>
-
-        </section>
-        
-    <?php
-        // ===============================
-        // SCHEMA PRODUCT (AggregateOffer)
-        // ===============================
-        
-        $min_price = null;
-        $max_price = null;
-        $offer_count = 0;
-        $images = [];
-        
-        if (!empty($data['colors'])) {
-        
-            foreach ($data['colors'] as $color => $color_data) {
-        
-                if (!empty($color_data['price'])) {
-        
-                    $price = (float) $color_data['price'];
-        
-                    if ($min_price === null || $price < $min_price) {
-                        $min_price = $price;
-                    }
-        
-                    if ($max_price === null || $price > $max_price) {
-                        $max_price = $price;
-                    }
-        
-                    $offer_count++;
-                }
-        
-                if (!empty($color_data['images'][0])) {
-                    $images[] = $color_data['images'][0];
-                }
-            }
-        }
-        
-        if ($min_price !== null) {
-        
-            $schema = [
-                "@context" => "https://schema.org",
-                "@type"    => "Product",
-                "name"     => get_the_title($product_id),
-                "url"      => get_permalink($product_id),
-                "image"    => array_values(array_unique($images)),
-                "offers"   => [
-                    "@type"         => "AggregateOffer",
-                    "priceCurrency" => "EUR",
-                    "lowPrice"      => number_format($min_price, 2, '.', ''),
-                    "highPrice"     => number_format($max_price, 2, '.', ''),
-                    "offerCount"    => $offer_count,
-                    "availability"  => "https://schema.org/InStock"
-                ]
-            ];
-        
-            echo '<script type="application/ld+json">';
-            echo wp_json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-            echo '</script>';
-        }
-        ?>
-        
-        <?php
-        return (string) ob_get_clean();
+{
+    if (!is_singular('fs_producto')) {
+        return '';
     }
+
+    global $post;
+
+    if (!$post instanceof \WP_Post) {
+        return '';
+    }
+
+    $product_id = (int) $post->ID;
+
+    $data = $this->build_product_data($product_id);
+
+    if (empty($data['colors'])) {
+        return '';
+    }
+
+    Assets::enqueue_product_detail();
+
+    wp_add_inline_script(
+        'fs-product-detail',
+        'window.FS_PRODUCT_DATA = ' . wp_json_encode($data) . ';',
+        'before'
+    );
+
+    /* =====================================================
+       CÁLCULO AUTOMÁTICO VALORACIÓN
+    ===================================================== */
+
+    $price = (float) get_field('fs_price_min', $product_id);
+
+    $brand_terms = wp_get_post_terms($product_id, 'fs_marca');
+    $brand = !empty($brand_terms) ? strtolower($brand_terms[0]->name) : '';
+
+    $caracteristicas = wp_get_post_terms($product_id, 'fs_caracteristica');
+    $is_resistencia = false;
+
+    foreach ($caracteristicas as $term) {
+        if ($term->slug === 'resistencia') {
+            $is_resistencia = true;
+        }
+    }
+
+    if ($price < 45) {
+        $gama = 'basica';
+    } elseif ($price <= 80) {
+        $gama = 'media';
+    } else {
+        $gama = 'alta';
+    }
+
+    $fit_map = [
+        'nike'   => 4.0,
+        'mizuno' => 4.5,
+        'joma'   => 4.5,
+        'kelme'  => 4.0,
+        'umbro'  => 3.8,
+        'puma'   => 4.0,
+        'adidas' => 4.2,
+    ];
+
+    $rating_fit = $fit_map[$brand] ?? 4.0;
+
+    $comfort_map = [
+        'basica' => 3.5,
+        'media'  => 4.0,
+        'alta'   => 4.5,
+    ];
+
+    $rating_comfort = $comfort_map[$gama];
+
+    $durability_map = [
+        'basica' => 3.0,
+        'media'  => 3.8,
+        'alta'   => 4.5,
+    ];
+
+    $rating_durability = $durability_map[$gama];
+
+    if ($is_resistencia) {
+        $rating_durability += 0.5;
+    }
+
+    if ($price < 45) {
+        $rating_value = 4.5;
+    } elseif ($price <= 80) {
+        $rating_value = 4.0;
+    } else {
+        $rating_value = 3.8;
+    }
+
+    $rating_global = round(
+        ($rating_fit + $rating_comfort + $rating_durability + $rating_value) / 4,
+        1
+    );
+
+    /* =====================================================
+       RENDER
+    ===================================================== */
+
+    ob_start();
+    ?>
+
+    <section class="fs-product-detail">
+
+        <div class="fs-product-detail__gallery">
+            <div class="fs-product-detail__thumbs"></div>
+
+            <div class="fs-product-detail__main-wrapper">
+                <button type="button" class="fs-product-detail__nav fs-product-detail__nav--prev">‹</button>
+                <img src="" class="fs-product-detail__main-image" alt="">
+                <button type="button" class="fs-product-detail__nav fs-product-detail__nav--next">›</button>
+            </div>
+        </div>
+
+        <div class="fs-product-detail__info">
+
+            <h1 class="fs-product-detail__title">
+                <?php echo esc_html(get_the_title($product_id)); ?>
+            </h1>
+
+            <div class="fs-product-detail__price"></div>
+            <div class="fs-product-detail__colors"></div>
+            <div class="fs-product-detail__sizes"></div>
+
+            <a href="#"
+               target="_blank"
+               rel="noopener"
+               class="fs-product-detail__cta">
+                Ir a tienda
+            </a>
+
+            <!-- ===============================
+                 BLOQUE VALORACIÓN
+            ================================ -->
+
+            <div class="fs-product-rating">
+
+                <div class="fs-product-rating__title">
+                    Valoración técnica
+                </div>
+
+                <div class="fs-product-rating__rows">
+
+                    <?php
+                    $ratings = [
+                        'Ajuste'         => $rating_fit,
+                        'Comodidad'      => $rating_comfort,
+                        'Durabilidad'    => $rating_durability,
+                        'Calidad-precio' => $rating_value,
+                    ];
+
+                    foreach ($ratings as $label => $rating) :
+
+                        $full = floor($rating);
+                        $half = ($rating - $full) >= 0.5 ? 1 : 0;
+                    ?>
+
+                        <div class="fs-product-rating__row">
+                            <span class="fs-product-rating__label"><?php echo esc_html($label); ?></span>
+                            <span class="fs-product-rating__stars">
+                                <?php for ($i = 0; $i < $full; $i++) echo '★'; ?>
+                                <?php if ($half) echo '☆'; ?>
+                            </span>
+                        </div>
+
+                    <?php endforeach; ?>
+
+                </div>
+
+                <div class="fs-product-rating__global">
+                    <?php echo esc_html($rating_global); ?> / 5
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="fs-product-detail__description"></div>
+
+    </section>
+
+    <?php
+
+    /* =====================================================
+       SCHEMA PRODUCT + AGGREGATE RATING
+    ===================================================== */
+
+    $min_price = null;
+    $max_price = null;
+    $offer_count = 0;
+    $images = [];
+
+    foreach ($data['colors'] as $color_data) {
+
+        if (!empty($color_data['price'])) {
+
+            $price = (float) $color_data['price'];
+
+            if ($min_price === null || $price < $min_price) {
+                $min_price = $price;
+            }
+
+            if ($max_price === null || $price > $max_price) {
+                $max_price = $price;
+            }
+
+            $offer_count++;
+        }
+
+        if (!empty($color_data['images'][0])) {
+            $images[] = $color_data['images'][0];
+        }
+    }
+
+    if ($min_price !== null) {
+
+        $schema = [
+            "@context" => "https://schema.org",
+            "@type"    => "Product",
+            "name"     => get_the_title($product_id),
+            "url"      => get_permalink($product_id),
+            "image"    => array_values(array_unique($images)),
+            "aggregateRating" => [
+                "@type" => "AggregateRating",
+                "ratingValue" => $rating_global,
+                "reviewCount" => 1
+            ],
+            "offers"   => [
+                "@type"         => "AggregateOffer",
+                "priceCurrency" => "EUR",
+                "lowPrice"      => number_format($min_price, 2, '.', ''),
+                "highPrice"     => number_format($max_price, 2, '.', ''),
+                "offerCount"    => $offer_count,
+                "availability"  => "https://schema.org/InStock"
+            ]
+        ];
+
+        echo '<script type="application/ld+json">';
+        echo wp_json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        echo '</script>';
+    }
+
+    return (string) ob_get_clean();
+}
 
     private function build_product_data(int $product_id): array
     {
@@ -817,4 +939,105 @@ final class Product_Detail
         return $title;
     }
 
+    function fs_calculate_product_rating($post_id)
+{
+    $price = (float) get_field('fs_price_min', $post_id);
+
+    $brand_terms = wp_get_post_terms($post_id, 'fs_marca');
+    $brand = !empty($brand_terms) ? strtolower($brand_terms[0]->name) : '';
+
+    $caracteristicas = wp_get_post_terms($post_id, 'fs_caracteristica');
+    $is_resistencia = false;
+
+    foreach ($caracteristicas as $term) {
+        if ($term->slug === 'resistencia') {
+            $is_resistencia = true;
+        }
+    }
+
+    /* =========================
+       GAMA
+    ========================== */
+
+    if ($price < 45) {
+        $gama = 'basica';
+    } elseif ($price <= 80) {
+        $gama = 'media';
+    } else {
+        $gama = 'alta';
+    }
+
+    /* =========================
+       AJUSTE
+    ========================== */
+
+    $fit_map = [
+        'nike'   => 4.0,
+        'mizuno' => 4.5,
+        'joma'   => 4.5,
+        'kelme'  => 4.0,
+        'umbro'  => 3.8,
+        'puma'   => 4.0,
+        'adidas' => 4.2,
+    ];
+
+    $rating_fit = $fit_map[$brand] ?? 4.0;
+
+    /* =========================
+       COMODIDAD
+    ========================== */
+
+    $comfort_map = [
+        'basica' => 3.5,
+        'media'  => 4.0,
+        'alta'   => 4.5,
+    ];
+
+    $rating_comfort = $comfort_map[$gama];
+
+    /* =========================
+       DURABILIDAD
+    ========================== */
+
+    $durability_map = [
+        'basica' => 3.0,
+        'media'  => 3.8,
+        'alta'   => 4.5,
+    ];
+
+    $rating_durability = $durability_map[$gama];
+
+    if ($is_resistencia) {
+        $rating_durability += 0.5;
+    }
+
+    /* =========================
+       CALIDAD PRECIO
+    ========================== */
+
+    if ($price < 45) {
+        $rating_value = 4.5;
+    } elseif ($price <= 80) {
+        $rating_value = 4.0;
+    } else {
+        $rating_value = 3.8;
+    }
+
+    /* =========================
+       GLOBAL
+    ========================== */
+
+    $rating_global = round(
+        ($rating_fit + $rating_comfort + $rating_durability + $rating_value) / 4,
+        1
+    );
+
+    return [
+        'fit'        => $rating_fit,
+        'comfort'    => $rating_comfort,
+        'durability' => $rating_durability,
+        'value'      => $rating_value,
+        'global'     => $rating_global,
+    ];
+}
 }

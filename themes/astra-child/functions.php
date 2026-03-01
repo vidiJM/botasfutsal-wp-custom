@@ -1,14 +1,17 @@
 <?php
 function astra_child_enqueue_styles() {
+
+    $css_file = get_stylesheet_directory() . '/style.css';
+
     wp_enqueue_style(
         'astra-child-style',
         get_stylesheet_uri(),
-        ['astra-theme-css'],
-        wp_get_theme()->get('Version')
+        ['astra-theme-css'], // dependencia correcta en Astra
+        file_exists($css_file) ? filemtime($css_file) : '1.0.0'
     );
 }
+add_action('wp_enqueue_scripts', 'astra_child_enqueue_styles', 20);
 
-add_action('wp_enqueue_scripts', 'astra_child_enqueue_styles');
 
 add_filter('astra_breadcrumb_trail_items', function ($items) {
 
@@ -193,3 +196,17 @@ add_action('wp_head', function(){
     echo '</script>';
 
 });
+
+/** CARACTERISTICAS PRODUCT **/
+if (is_tax('fs_caracteristica')) {
+
+    $term = get_queried_object();
+
+    $home = $items[0];
+
+    $items = [
+        $home,
+        '<a href="' . get_post_type_archive_link('fs_producto') . '">Zapatillas de Fútbol Sala</a>',
+        '<span class="trail-end" aria-current="page">' . esc_html($term->name) . '</span>'
+    ];
+}

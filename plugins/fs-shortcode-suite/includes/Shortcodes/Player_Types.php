@@ -23,36 +23,49 @@ final class Player_Types
         ob_start();
         ?>
 
-        <section class="fs-player-types">
+        <section class="fs-player-types" aria-labelledby="fs-player-types-title">
             <div class="fs-player-types__container">
 
+                <!-- ================= HEADER ================= -->
+
                 <header class="fs-player-types__header">
-                    <h2 class="fs-player-types__title">
+                    <h2 
+                        id="fs-player-types-title"
+                        class="fs-player-types__title"
+                    >
                         <?php echo esc_html__('Elige tu tipo de juego', 'fs-shortcode-suite'); ?>
                     </h2>
+
                     <p class="fs-player-types__subtitle">
                         <?php echo esc_html__('Encuentra las botas perfectas según tu estilo en pista.', 'fs-shortcode-suite'); ?>
                     </p>
                 </header>
+
+                <!-- ================= GRID ================= -->
 
                 <div class="fs-player-types__grid">
 
                     <?php
                     echo $this->card(
                         496413,
-                        home_url('/zapatillas-futbol-sala-para/resistencia/'));
+                        home_url('/zapatillas-futbol-sala-para/resistencia/'),
+                        false // primera imagen eager
+                    );
 
                     echo $this->card(
                         496417,
-                        home_url('/zapatillas-futbol-sala-para/calidad-precio/'));
+                        home_url('/zapatillas-futbol-sala-para/calidad-precio/')
+                    );
 
                     echo $this->card(
                         496411,
-                        home_url('/zapatillas-futbol-sala-para/velocidad/'));
+                        home_url('/zapatillas-futbol-sala-para/velocidad/')
+                    );
 
                     echo $this->card(
                         496412,
-                        home_url('/zapatillas-futbol-sala-para/control/'));
+                        home_url('/zapatillas-futbol-sala-para/control/')
+                    );
                     ?>
 
                 </div>
@@ -64,20 +77,28 @@ final class Player_Types
         return (string) ob_get_clean();
     }
 
+    /**
+     * Card generator
+     */
     private function card(
         int $image_id,
         string $url,
-
+        bool $lazy = true
     ): string {
+
+        // Primera imagen above-the-fold no debe ir lazy
+        $loading  = $lazy ? 'lazy' : 'eager';
+        $fetch    = $lazy ? 'auto' : 'high';
 
         $image_html = wp_get_attachment_image(
             $image_id,
             'large',
             false,
             [
-                'class'    => 'fs-player-types__image',
-                'loading'  => 'lazy',
-                'decoding' => 'async'
+                'class'         => 'fs-player-types__image',
+                'loading'       => $loading,
+                'decoding'      => 'async',
+                'fetchpriority' => $fetch,
             ]
         );
 
@@ -89,8 +110,10 @@ final class Player_Types
         ?>
 
         <article class="fs-player-types__card">
-            <a href="<?php echo esc_url($url); ?>" class="fs-player-types__link">
-
+            <a 
+                href="<?php echo esc_url($url); ?>" 
+                class="fs-player-types__link"
+            >
                 <div class="fs-player-types__media">
                     <?php echo $image_html; ?>
                 </div>

@@ -1,5 +1,9 @@
+/* =====================================
+   PLAYER TYPES – MOBILE FIRST
+===================================== */
+
 .fs-player-types {
-    padding: 100px 1.5rem;
+    padding: 60px 16px;
     background: #f6f7f9;
 }
 
@@ -8,46 +12,57 @@
     margin: 0 auto;
 }
 
+/* =====================================
+   HEADER
+===================================== */
+
 .fs-player-types__header {
     text-align: center;
-    margin-bottom: 70px;
+    margin-bottom: 40px;
 }
 
 .fs-player-types__title {
     font-family: "Montserrat", -apple-system, BlinkMacSystemFont,
                  "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    font-size: 30px;
+    font-size: 24px;
     font-weight: 600;
-    margin-bottom: 20px;
+    margin-bottom: 14px;
     color: #111827;
-    letter-spacing: 1px;
-    line-height: 1.3px;
+    letter-spacing: 0.5px;
+    line-height: 1.25; /* FIX crítico */
 }
 
 .fs-player-types__subtitle {
     font-family: "Montserrat", -apple-system, BlinkMacSystemFont,
                  "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 500;
     color: #6b7280;
+    line-height: 1.5;
+    max-width: 520px;
+    margin: 0 auto;
 }
+
+/* =====================================
+   GRID
+===================================== */
 
 .fs-player-types__grid {
     display: grid;
-    gap: 40px;
+    gap: 20px;
 }
+
+/* =====================================
+   CARD
+===================================== */
 
 .fs-player-types__card {
     background: #ffffff;
-    border-radius: 4px;
+    border-radius: 10px;
     overflow: hidden;
-    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.04);
-    transition: transform .35s ease, box-shadow .35s ease;
-}
-
-.fs-player-types__card:hover {
-    transform: translateY(-8px);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.04);
+    transition: transform .3s ease, box-shadow .3s ease;
+    will-change: transform;
 }
 
 .fs-player-types__link {
@@ -57,6 +72,7 @@
 }
 
 .fs-player-types__media {
+    position: relative;
     overflow: hidden;
 }
 
@@ -64,44 +80,61 @@
     width: 100%;
     height: auto;
     display: block;
-    transition: transform .6s ease;
+    transition: transform .5s ease;
 }
 
-.fs-player-types__card:hover .fs-player-types__image {
-    transform: scale(1.06);
-}
+/* Hover solo en dispositivos que soportan hover */
+@media (hover: hover) {
+    .fs-player-types__card:hover {
+        transform: translateY(-6px);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+    }
 
-.fs-player-types__content {
-    padding: 28px 26px 32px;
-}
-
-.fs-player-types__card-title {
-    font-family: "Montserrat", -apple-system, BlinkMacSystemFont,
-                 "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    font-size: 20px;
-    font-weight: 600;
-    margin-bottom: 12px;
-    color: #111827;
-}
-
-.fs-player-types__card-description {
-    font-family: "Montserrat", -apple-system, BlinkMacSystemFont,
-                 "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    font-size: 15px;
-    line-height: 1.7;
-    color: #6b7280;
-}
-
-/* Responsive */
-
-@media (min-width: 640px) {
-    .fs-player-types__grid {
-        grid-template-columns: repeat(2, 1fr);
+    .fs-player-types__card:hover .fs-player-types__image {
+        transform: scale(1.04);
     }
 }
 
+/* =====================================
+   TABLET
+===================================== */
+
+@media (min-width: 640px) {
+
+    .fs-player-types {
+        padding: 80px 24px;
+    }
+
+    .fs-player-types__title {
+        font-size: 28px;
+    }
+
+    .fs-player-types__subtitle {
+        font-size: 15px;
+    }
+
+    .fs-player-types__grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 28px;
+    }
+}
+
+/* =====================================
+   DESKTOP
+===================================== */
+
 @media (min-width: 1100px) {
+
+    .fs-player-types {
+        padding: 100px 32px;
+    }
+
+    .fs-player-types__title {
+        font-size: 32px;
+    }
+
     .fs-player-types__grid {
         grid-template-columns: repeat(4, 1fr);
+        gap: 36px;
     }
 }
